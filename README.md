@@ -1,4 +1,4 @@
-# Mis Gastos — versión Supabase
+# Mis Gastos — Supabase
 
 Migración de la app "Mis Gastos" (antes en Google Apps Script + Google
 Sheets) a Supabase como base de datos, con la misma interfaz de 4
