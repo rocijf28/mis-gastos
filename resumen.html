@@ -62,7 +62,7 @@
 
   <section class="card" id="necesarioCard">
     <p class="eyebrow" style="margin-bottom:4px;">Necesario vs. prescindible (mes actual)</p>
-    <p class="hint" style="margin:0 0 12px;">En "prescindible" está tu verdadera capacidad de ahorro.</p>
+    <p class="hint" style="margin:0 0 12px;">En "prescindible" está tu verdadera capacidad de ahorro. Cada gasto puede cambiar de grupo individualmente al registrarlo o editarlo.</p>
     <div class="cat-rows" id="necesarioRows"></div>
     <p class="empty-note" id="necesarioEmpty" hidden>Aún no has registrado gastos este mes.</p>
   </section>
@@ -161,17 +161,19 @@ var PAGINA_ACTUAL = 'resumen';
     if (total <= 0) return;
 
     [
-      { name: 'Necesario', value: necesarioMes, color: 'var(--good)' },
-      { name: 'Prescindible', value: prescindibleMes, color: 'var(--accent)' }
+      { name: 'Necesario', value: necesarioMes, color: 'var(--good)', tipo: 'necesario' },
+      { name: 'Prescindible', value: prescindibleMes, color: 'var(--accent)', tipo: 'prescindible' }
     ].forEach(function (entry) {
       var pct = Math.round((entry.value / total) * 100);
+      var categorias = categoriasPorDefecto(entry.tipo);
       var wrap = document.createElement('div');
       wrap.innerHTML =
         '<div class="cat-row-label">' +
           '<span class="name"><span class="cat-dot" style="background:' + entry.color + '"></span>' + entry.name + '</span>' +
           '<span class="value">' + eur(entry.value) + ' · ' + pct + '%</span>' +
         '</div>' +
-        '<div class="bar-track"><div class="bar-fill" style="width:' + Math.max(4, pct) + '%; background:' + entry.color + '"></div></div>';
+        '<div class="bar-track"><div class="bar-fill" style="width:' + Math.max(4, pct) + '%; background:' + entry.color + '"></div></div>' +
+        '<p class="hint" style="margin:4px 0 0;">Por defecto: ' + categorias + '</p>';
       necesarioRows.appendChild(wrap);
     });
   }
