@@ -57,7 +57,7 @@
 
   <section class="card" id="fijosCard">
     <button type="button" class="collapsible-header" id="fijosToggle" aria-expanded="false" aria-controls="fijosBody">
-      <p class="eyebrow" style="margin:0;">Tus gastos fijos</p>
+      <p class="eyebrow" style="margin:0;" id="fijosToggleLabel">Ver mis gastos fijos</p>
       <span class="collapsible-chevron" aria-hidden="true">▾</span>
     </button>
     <div class="collapsible-body" id="fijosBody" hidden>
@@ -146,6 +146,7 @@ var PAGINA_ACTUAL = 'fijos';
   var fijosEmpty = document.getElementById('fijosEmpty');
   var fijosErrorNote = document.getElementById('fijosErrorNote');
   var fijosToggle = document.getElementById('fijosToggle');
+  var fijosToggleLabel = document.getElementById('fijosToggleLabel');
   var fijosBody = document.getElementById('fijosBody');
   var fijoConceptoInput = document.getElementById('fijoConceptoInput');
   var fijoCategoriaInput = document.getElementById('fijoCategoriaInput');
@@ -174,8 +175,10 @@ var PAGINA_ACTUAL = 'fijos';
 
   fijosToggle.addEventListener('click', function () {
     var expandido = fijosToggle.getAttribute('aria-expanded') === 'true';
-    fijosToggle.setAttribute('aria-expanded', String(!expandido));
+    var nuevoExpandido = !expandido;
+    fijosToggle.setAttribute('aria-expanded', String(nuevoExpandido));
     fijosBody.hidden = expandido;
+    fijosToggleLabel.textContent = nuevoExpandido ? 'Ocultar mis gastos fijos' : 'Ver mis gastos fijos';
   });
 
   fijoVariableInput.addEventListener('change', function () {
