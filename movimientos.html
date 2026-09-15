@@ -31,6 +31,7 @@
     <a class="nav-link" data-page="fijos" href="gastos-fijos.html">Gastos fijos</a>
     <a class="nav-link" data-page="ingresos-fijos" href="ingresos-fijos.html">Ingresos fijos</a>
     <a class="nav-link" data-page="resumen" href="resumen.html">Resumen</a>
+    <a class="nav-link" data-page="anomalias" href="anomalias.html">Anomalías</a>
   </nav>
 
   <div class="modal-overlay" id="dineroInicialModal" hidden>
@@ -183,6 +184,14 @@ var PAGINA_ACTUAL = 'movimientos';
       metField.appendChild(metLabel); metField.appendChild(metodoInput);
       wrap.appendChild(metField);
 
+      var tipoField = document.createElement('div'); tipoField.className = 'field';
+      var tipoLabel = document.createElement('label'); tipoLabel.textContent = 'Necesario / prescindible';
+      var tipoGastoInput = document.createElement('select');
+      poblarSelectTipoGasto(tipoGastoInput);
+      tipoGastoInput.value = mov.tipoGasto || '';
+      tipoField.appendChild(tipoLabel); tipoField.appendChild(tipoGastoInput);
+      wrap.appendChild(tipoField);
+
       var notaField = document.createElement('div'); notaField.className = 'field';
       var notaLabel = document.createElement('label'); notaLabel.textContent = 'Nota (opcional)';
       notaInput = document.createElement('input'); notaInput.type = 'text'; notaInput.value = mov.nota || '';
@@ -190,6 +199,7 @@ var PAGINA_ACTUAL = 'movimientos';
       wrap.appendChild(notaField);
 
       wrap._importeInput = importeInput;
+      wrap._tipoGastoInput = tipoGastoInput;
     } else {
       var conField = document.createElement('div'); conField.className = 'field';
       var conLabel = document.createElement('label'); conLabel.textContent = 'Concepto';
@@ -245,6 +255,7 @@ var PAGINA_ACTUAL = 'movimientos';
         payload.categoria = categoriaInput.value;
         payload.metodoPago = metodoInput.value;
         payload.nota = notaInput.value.trim();
+        payload.tipoGasto = wrap._tipoGastoInput.value || null;
       } else {
         var concepto = conceptoInput.value.trim();
         if (!concepto) { errorP.textContent = 'Escribe un concepto.'; return; }
