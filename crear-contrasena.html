@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mis Gastos — Crear contraseña</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1e2a1d">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mis Gastos">
+</head>
+<body>
+
+<div class="login-wrap">
+  <p class="login-logo">Mis Gastos</p>
+
+  <section class="card" id="verificandoCard">
+    <p class="card-title">Comprobando invitación</p>
+    <p>Un momento, estamos validando tu enlace de invitación…</p>
+  </section>
+
+  <section class="card" id="formCard" hidden>
+    <p class="card-title">Crear contraseña</p>
+    <p>Te han invitado a usar Mis Gastos. Elige la contraseña con la que vas a entrar a partir de ahora.</p>
+
+    <div class="field">
+      <label for="passwordInput">Contraseña</label>
+      <input type="password" id="passwordInput" autocomplete="new-password" />
+    </div>
+    <div class="field">
+      <label for="password2Input">Repite la contraseña</label>
+      <input type="password" id="password2Input" autocomplete="new-password" />
+    </div>
+
+    <p class="form-error" id="formError"></p>
+    <button class="submit-btn" id="saveBtn" type="button">Guardar y entrar</button>
+  </section>
+
+  <section class="card" id="errorCard" hidden>
+    <p class="card-title">Enlace no válido</p>
+    <p class="error-note" id="errorMsg"></p>
+    <p>Pide que te envíen una invitación nueva desde la app, o entra directamente si ya tienes contraseña.</p>
+    <a class="link-btn" href="login.html">Ir a la pantalla de entrar</a>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var supabaseClient = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+
+  var verificandoCard = document.getElementById('verificandoCard');
+  var formCard = document.getElementById('formCard');
+  var errorCard = document.getElementById('errorCard');
+  var errorMsg = document.getElementById('errorMsg');
+
+  var passwordInput = document.getElementById('passwordInput');
+  var password2Input = document.getElementById('password2Input');
+  var formError = document.getElementById('formError');
+  var saveBtn = document.getElementById('saveBtn');
+
+  function mostrarFormulario() {
+    verificandoCard.hidden = true;
+    errorCard.hidden = true;
+    formCard.hidden = false;
+  }
+
+  function mostrarError(mensaje) {
+    verificandoCard.hidden = true;
+    formCard.hidden = true;
+    errorCard.hidden = false;
+    errorMsg.textContent = mensaje;
+  }
+
+  function limpiarTexto(txt) {
+    return decodeURIComponent((txt || '').replace(/\+/g, ' '));
+  }
+
+  // El enlace de invitación puede llegar con el error en la URL (por
+  // ejemplo, si ya se usó antes o ha caducado) — Supabase lo indica con
+  // "error_description", ya sea en el "hash" (#...) o en la query (?...).
+  var hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  var queryParams = new URLSearchParams(window.location.search);
+  var errorDescription = hashParams.get('error_description') || queryParams.get('error_description');
+
+  if (errorDescription) {
+    mostrarError('El enlace no es válido o ha caducado: ' + limpiarTexto(errorDescription));
+  } else {
+    // El cliente de Supabase procesa automáticamente el enlace de la URL
+    // y crea la sesión — puede que ya esté lista, o llegar un instante
+    // después mediante este evento.
+    supabaseClient.auth.onAuthStateChange(function (_event, session) {
+      if (session) mostrarFormulario();
+    });
+    supabaseClient.auth.getSession().then(function (res) {
+      if (res.data && res.data.session) mostrarFormulario();
+    });
+
+    // Si tras unos segundos no ha aparecido ninguna sesión ni ningún
+    // error explícito, el enlace no es uno de invitación válido.
+    setTimeout(function () {
+      if (formCard.hidden && errorCard.hidden) {
+        mostrarError('No hemos podido validar el enlace. Puede que ya se haya usado o que haya caducado.');
+      }
+    }, 4000);
+  }
+
+  function guardarContrasena() {
+    var p1 = passwordInput.value;
+    var p2 = password2Input.value;
+
+    if (!p1 || p1.length < 6) {
+      formError.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+      return;
+    }
+    if (p1 !== p2) {
+      formError.textContent = 'Las dos contraseñas no coinciden.';
+      return;
+    }
+
+    formError.textContent = '';
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Guardando…';
+
+    supabaseClient.auth.updateUser({ password: p1 })
+      .then(function (res) {
+        if (res.error) throw new Error(res.error.message);
+        window.location.href = 'index.html';
+      })
+      .catch(function (err) {
+        formError.textContent = 'No se pudo guardar la contraseña: ' + (err.message || 'inténtalo de nuevo.');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Guardar y entrar';
+      });
+  }
+
+  saveBtn.addEventListener('click', guardarContrasena);
+  password2Input.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') guardarContrasena(); });
+})();
+</script>
+</body>
+</html>
