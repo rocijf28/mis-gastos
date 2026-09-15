@@ -22,6 +22,12 @@
     --cat-compras: #a15a37;
     --cat-suscripciones: #5a5a8a;
     --cat-otros: #6b6b63;
+
+    /* Verde oscuro fijo para el feedback al pulsar un botón: no cambia
+    en modo oscuro (no se redefine en el bloque de abajo), para que la
+    respuesta táctil sea siempre reconocible igual. */
+    --pressed: #1e2a1d;
+    --pressed-ink-on: #f6f9f1;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -211,7 +217,6 @@
     box-shadow: inset 0 0 0 1px var(--ink);
   }
   .cat-chip[aria-pressed="true"] .cat-dot { background: var(--surface); }
-  .cat-chip:active { transform: scale(0.98); }
   .cat-dot {
     width: 8px; height: 8px; border-radius: 50%;
     background: var(--cat-color, var(--ink-muted));
@@ -605,6 +610,53 @@
 
   [hidden] { display: none !important; }
 
+  /* --- Feedback al pulsar: todos los botones se oscurecen a verde
+  al pulsarlos (mismo verde siempre, claro u oscuro), con un ligero
+  "hundimiento" para que se note que ha respondido al toque/clic. En
+  ratón, además, un hover suave anticipa que el elemento es pulsable. --- */
+  .submit-btn,
+  .mini-btn,
+  .type-btn,
+  .cat-chip,
+  .nav-link,
+  .mov-icon-btn,
+  .link-btn,
+  .collapsible-header,
+  .fijo-actions .link-btn {
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease, transform 80ms ease;
+  }
+
+  @media (hover: hover) {
+    .submit-btn:not(:disabled):hover { filter: brightness(0.94); }
+    .mini-btn:not(:disabled):hover { filter: brightness(1.15); }
+    .type-btn:hover { border-color: var(--pressed); }
+    .cat-chip:hover { border-color: var(--pressed); }
+    .nav-link:hover:not(.active) { background: var(--surface-2); }
+    .mov-icon-btn:hover { filter: brightness(0.92); }
+    .link-btn:hover { color: var(--ink); }
+  }
+
+  .submit-btn:active:not(:disabled),
+  .mini-btn:active:not(:disabled),
+  .type-btn:active,
+  .cat-chip:active,
+  .nav-link:active,
+  .mov-icon-btn:active,
+  .fijo-actions .link-btn:active {
+    background: var(--pressed) !important;
+    border-color: var(--pressed) !important;
+    color: var(--pressed-ink-on) !important;
+    transform: scale(0.97);
+  }
+
+  .link-btn:active { color: var(--pressed); }
+
+  .cat-chip:active .cat-dot { background: var(--pressed-ink-on); }
+
   @media (prefers-reduced-motion: reduce) {
-    .submit-btn, .toast { transition: none; }
+    .submit-btn, .toast,
+    .submit-btn, .mini-btn, .type-btn, .cat-chip, .nav-link,
+    .mov-icon-btn, .link-btn, .collapsible-header, .fijo-actions .link-btn {
+      transition: none;
+    }
   }
