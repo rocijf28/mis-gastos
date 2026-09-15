@@ -31,6 +31,7 @@
     <a class="nav-link" data-page="fijos" href="gastos-fijos.html">Gastos fijos</a>
     <a class="nav-link" data-page="ingresos-fijos" href="ingresos-fijos.html">Ingresos fijos</a>
     <a class="nav-link" data-page="resumen" href="resumen.html">Resumen</a>
+    <a class="nav-link" data-page="anomalias" href="anomalias.html">Anomalías</a>
   </nav>
 
   <div class="modal-overlay" id="dineroInicialModal" hidden>
@@ -49,20 +50,74 @@
     </div>
   </div>
 
-  <section class="card ingresos-fijos-card" id="ingresosFijosCard">
-    <p class="eyebrow" style="margin-bottom:10px;">Ingresos fijos por mes</p>
-    <div class="two-col">
+  <section class="card pendientes-card" id="pendientesCard" hidden>
+    <p class="eyebrow" style="margin-bottom:10px;">Toca confirmar el importe</p>
+    <div id="pendientesList"></div>
+  </section>
+
+  <section class="card" id="ingresosFijosListCard">
+    <button type="button" class="collapsible-header" id="ingresosToggle" aria-expanded="false" aria-controls="ingresosBody">
+      <p class="eyebrow" style="margin:0;">Tus ingresos fijos</p>
+      <span class="collapsible-chevron" aria-hidden="true">▾</span>
+    </button>
+    <div class="collapsible-body" id="ingresosBody" hidden>
+      <div id="ingresosList"></div>
+      <p class="empty-note" id="ingresosEmpty" hidden>Aún no tienes ingresos fijos configurados.</p>
+      <p class="error-note" id="ingresosErrorNote" hidden>No se pudo cargar. Recarga la página.</p>
+    </div>
+
+    <div class="fijo-form">
+      <p class="fijo-form-title" id="ingresoFormTitle">Añadir ingreso fijo</p>
+
       <div class="field">
-        <label for="mesSelect">Mes</label>
-        <select id="mesSelect"></select>
+        <label for="ingresoConceptoInput">Concepto</label>
+        <input type="text" id="ingresoConceptoInput" placeholder="Ej. Nómina" maxlength="120" />
       </div>
+
+      <div class="two-col">
+        <div class="field">
+          <label for="ingresoImporteInput" id="ingresoImporteLabel">Importe</label>
+          <input type="number" inputmode="decimal" step="0.01" min="0" id="ingresoImporteInput" placeholder="0,00" />
+        </div>
+        <div class="field">
+          <label for="ingresoFrecuenciaInput">Frecuencia</label>
+          <select id="ingresoFrecuenciaInput"></select>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="field">
+          <label for="ingresoMetodoInput">Método</label>
+          <select id="ingresoMetodoInput"></select>
+        </div>
+        <div class="field">
+          <label for="ingresoFechaInput">Próxima fecha</label>
+          <input type="date" id="ingresoFechaInput" />
+        </div>
+      </div>
+
       <div class="field">
-        <label for="ingresoFijoInput">Importe</label>
-        <input type="number" inputmode="decimal" step="0.01" min="0" id="ingresoFijoInput" placeholder="0,00" aria-label="Ingresos fijos del mes en euros" />
+        <label for="ingresoNotaInput">Nota (opcional)</label>
+        <input type="text" id="ingresoNotaInput" placeholder="Opcional" maxlength="120" />
+      </div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="ingresoActivoInput" checked />
+        <label for="ingresoActivoInput">Activo (se añadirá solo a Ingresos cuando toque)</label>
+      </div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="ingresoVariableInput" />
+        <label for="ingresoVariableInput">Importe variable (tu nómina, si cambia cada mes): te avisaremos para que confirmes el importe real, en vez de añadirlo solo</label>
+      </div>
+
+      <p class="form-error" id="ingresoFormError"></p>
+
+      <div class="fijo-form-actions">
+        <button class="submit-btn is-income" id="ingresoSaveBtn" type="button">Añadir</button>
+        <button class="link-btn" id="ingresoCancelBtn" type="button" hidden>Cancelar edición</button>
       </div>
     </div>
-    <button type="button" class="mini-btn" id="ingresoFijoSaveBtn">Guardar</button>
-    <p class="hint">Si cambias el mes actual, se usa también como referencia para los próximos meses.</p>
   </section>
 </div>
 
@@ -77,77 +132,261 @@ var PAGINA_ACTUAL = 'ingresos-fijos';
 (function () {
   'use strict';
 
-  var mesSelect = document.getElementById('mesSelect');
-  var ingresoFijoInput = document.getElementById('ingresoFijoInput');
-  var ingresoFijoSaveBtn = document.getElementById('ingresoFijoSaveBtn');
-  var mesesData = [];
+  var ingresosList = document.getElementById('ingresosList');
+  var ingresosEmpty = document.getElementById('ingresosEmpty');
+  var ingresosErrorNote = document.getElementById('ingresosErrorNote');
+  var ingresosToggle = document.getElementById('ingresosToggle');
+  var ingresosBody = document.getElementById('ingresosBody');
+  var ingresoConceptoInput = document.getElementById('ingresoConceptoInput');
+  var ingresoImporteInput = document.getElementById('ingresoImporteInput');
+  var ingresoImporteLabel = document.getElementById('ingresoImporteLabel');
+  var ingresoFrecuenciaInput = document.getElementById('ingresoFrecuenciaInput');
+  var ingresoMetodoInput = document.getElementById('ingresoMetodoInput');
+  var ingresoFechaInput = document.getElementById('ingresoFechaInput');
+  var ingresoNotaInput = document.getElementById('ingresoNotaInput');
+  var ingresoActivoInput = document.getElementById('ingresoActivoInput');
+  var ingresoVariableInput = document.getElementById('ingresoVariableInput');
+  var ingresoFormError = document.getElementById('ingresoFormError');
+  var ingresoFormTitle = document.getElementById('ingresoFormTitle');
+  var ingresoSaveBtn = document.getElementById('ingresoSaveBtn');
+  var ingresoCancelBtn = document.getElementById('ingresoCancelBtn');
+  var pendientesCard = document.getElementById('pendientesCard');
+  var pendientesList = document.getElementById('pendientesList');
+  var ingresoIdEditando = null;
 
-  function actualizarInputIngresoFijo() {
-    var clave = mesSelect.value;
-    var entry = mesesData.filter(function (m) { return m.clave === clave; })[0];
-    if (!entry) { ingresoFijoInput.value = ''; return; }
-    var valor = entry.ingresoFijo !== null ? entry.ingresoFijo : window.NOMINA_SUGERIDA;
-    ingresoFijoInput.value = valor ? Number(valor).toFixed(2) : '';
-  }
+  poblarSelectFrecuencias(ingresoFrecuenciaInput);
+  poblarSelectMetodosFijos(ingresoMetodoInput);
+  ingresoFechaInput.value = hoyISO();
 
-  function renderMeses(meses) {
-    mesesData = meses || [];
-    var seleccionPrevia = mesSelect.value;
-    mesSelect.innerHTML = '';
-    mesesData.forEach(function (m) {
-      var opt = document.createElement('option');
-      opt.value = m.clave;
-      opt.textContent = m.etiqueta;
-      mesSelect.appendChild(opt);
+  ingresosToggle.addEventListener('click', function () {
+    var expandido = ingresosToggle.getAttribute('aria-expanded') === 'true';
+    ingresosToggle.setAttribute('aria-expanded', String(!expandido));
+    ingresosBody.hidden = expandido;
+  });
+
+  ingresoVariableInput.addEventListener('change', function () {
+    ingresoImporteLabel.textContent = ingresoVariableInput.checked ? 'Importe orientativo' : 'Importe';
+  });
+
+  function renderPendientes(pendientes) {
+    pendientesList.innerHTML = '';
+    pendientes = pendientes || [];
+    pendientesCard.hidden = pendientes.length === 0;
+
+    pendientes.forEach(function (p) {
+      var row = document.createElement('div');
+      row.className = 'pendiente-row';
+
+      var info = document.createElement('div');
+      info.className = 'pendiente-info';
+      var titleEl = document.createElement('p');
+      titleEl.className = 'pendiente-title';
+      titleEl.textContent = p.concepto;
+      var metaEl = document.createElement('p');
+      metaEl.className = 'pendiente-meta';
+      metaEl.textContent = formatearFechaCorta(p.proximaFecha) +
+        (p.retraso > 0 ? ' · y ' + p.retraso + (p.retraso === 1 ? ' mes más pendiente' : ' meses más pendientes') : '');
+      info.appendChild(titleEl);
+      info.appendChild(metaEl);
+
+      var form = document.createElement('div');
+      form.className = 'pendiente-form';
+      var importeInput = document.createElement('input');
+      importeInput.type = 'number';
+      importeInput.inputMode = 'decimal';
+      importeInput.step = '0.01';
+      importeInput.min = '0';
+      importeInput.placeholder = '0,00';
+      var confirmBtn = document.createElement('button');
+      confirmBtn.type = 'button';
+      confirmBtn.className = 'mini-btn';
+      confirmBtn.textContent = 'Confirmar';
+      confirmBtn.addEventListener('click', function () {
+        var importe = parseFloat(importeInput.value);
+        if (!importe || importe <= 0) { showToast('Escribe un importe válido.'); return; }
+        confirmBtn.disabled = true;
+        confirmarIngresoFijoVariable(p.id, importe)
+          .then(function () {
+            showToast(p.concepto + ' confirmado: ' + eur(importe));
+            cargarResumen();
+          })
+          .catch(function (err) {
+            showToast(err.message || 'No se pudo confirmar.');
+            confirmBtn.disabled = false;
+          });
+      });
+
+      form.appendChild(importeInput);
+      form.appendChild(confirmBtn);
+      row.appendChild(info);
+      row.appendChild(form);
+      pendientesList.appendChild(row);
     });
-    var actual = mesesData.filter(function (m) { return m.esMesActual; })[0];
-    var siguePresente = mesesData.some(function (m) { return m.clave === seleccionPrevia; });
-    mesSelect.value = siguePresente ? seleccionPrevia : (actual ? actual.clave : (mesesData[0] && mesesData[0].clave) || '');
-    actualizarInputIngresoFijo();
   }
 
-  mesSelect.addEventListener('change', actualizarInputIngresoFijo);
+  function renderIngresos(ingresos) {
+    ingresosList.innerHTML = '';
+    ingresos = ingresos || [];
+    ingresosEmpty.hidden = ingresos.length > 0;
 
-  ingresoFijoSaveBtn.addEventListener('click', function () {
-    var clave = mesSelect.value;
-    var importe = parseFloat(ingresoFijoInput.value);
-    if (!clave) {
-      showToast('Elige un mes.');
-      return;
-    }
-    if (isNaN(importe) || importe < 0) {
-      showToast('Escribe un importe válido.');
-      return;
-    }
-    ingresoFijoSaveBtn.disabled = true;
-    ingresoFijoSaveBtn.textContent = 'Guardando…';
+    ingresos.forEach(function (ing) {
+      var row = document.createElement('div');
+      row.className = 'fijo-row' + (ing.activo ? '' : ' inactivo');
 
-    guardarIngresoFijoMes(clave, importe)
+      var info = document.createElement('div');
+      info.className = 'fijo-info';
+      var titleEl = document.createElement('p');
+      titleEl.className = 'fijo-title';
+      titleEl.textContent = ing.concepto;
+      var metaEl = document.createElement('p');
+      metaEl.className = 'fijo-meta';
+      metaEl.textContent = ing.frecuencia + ' · próximo ' + formatearFechaCorta(ing.proximaFecha) +
+        (ing.variable ? ' · variable' : '') + (ing.activo ? '' : ' · pausado');
+      var amountEl = document.createElement('p');
+      amountEl.className = 'fijo-amount';
+      amountEl.textContent = eur(ing.importe);
+      info.appendChild(titleEl);
+      info.appendChild(metaEl);
+      info.appendChild(amountEl);
+
+      var actions = document.createElement('div');
+      actions.className = 'fijo-actions';
+      var editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'link-btn';
+      editBtn.textContent = 'Editar';
+      editBtn.addEventListener('click', function () { cargarIngresoEnFormulario(ing); });
+
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'link-btn danger';
+      delBtn.textContent = 'Eliminar';
+      delBtn.dataset.confirm = '0';
+      var confirmTimeout = null;
+      delBtn.addEventListener('click', function () {
+        if (delBtn.dataset.confirm === '1') {
+          clearTimeout(confirmTimeout);
+          borrarIngresoFijo(ing, delBtn);
+          return;
+        }
+        delBtn.dataset.confirm = '1';
+        delBtn.textContent = '¿Seguro?';
+        confirmTimeout = setTimeout(function () {
+          delBtn.dataset.confirm = '0';
+          delBtn.textContent = 'Eliminar';
+        }, 3500);
+      });
+
+      actions.appendChild(editBtn);
+      actions.appendChild(delBtn);
+      row.appendChild(info);
+      row.appendChild(actions);
+      ingresosList.appendChild(row);
+    });
+  }
+
+  function cargarIngresoEnFormulario(ing) {
+    ingresoIdEditando = ing.id;
+    ingresoConceptoInput.value = ing.concepto;
+    ingresoImporteInput.value = ing.importe ? ing.importe.toFixed(2) : '';
+    ingresoFrecuenciaInput.value = ing.frecuencia;
+    ingresoMetodoInput.value = ing.metodoPago;
+    ingresoFechaInput.value = ing.proximaFecha;
+    ingresoNotaInput.value = ing.nota;
+    ingresoActivoInput.checked = !!ing.activo;
+    ingresoVariableInput.checked = !!ing.variable;
+    ingresoImporteLabel.textContent = ing.variable ? 'Importe orientativo' : 'Importe';
+    ingresoFormTitle.textContent = 'Editar ingreso fijo';
+    ingresoSaveBtn.textContent = 'Guardar cambios';
+    ingresoCancelBtn.hidden = false;
+    ingresoFormError.textContent = '';
+    document.getElementById('ingresosFijosListCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function resetIngresoFormulario() {
+    ingresoIdEditando = null;
+    ingresoConceptoInput.value = '';
+    ingresoImporteInput.value = '';
+    ingresoFrecuenciaInput.selectedIndex = 0;
+    ingresoMetodoInput.selectedIndex = 0;
+    ingresoFechaInput.value = hoyISO();
+    ingresoNotaInput.value = '';
+    ingresoActivoInput.checked = true;
+    ingresoVariableInput.checked = false;
+    ingresoImporteLabel.textContent = 'Importe';
+    ingresoFormTitle.textContent = 'Añadir ingreso fijo';
+    ingresoSaveBtn.textContent = 'Añadir';
+    ingresoCancelBtn.hidden = true;
+    ingresoFormError.textContent = '';
+  }
+
+  ingresoCancelBtn.addEventListener('click', resetIngresoFormulario);
+
+  ingresoSaveBtn.addEventListener('click', function () {
+    var concepto = ingresoConceptoInput.value.trim();
+    var importe = parseFloat(ingresoImporteInput.value);
+
+    if (!concepto) { ingresoFormError.textContent = 'Escribe un concepto.'; return; }
+    if (!importe || importe <= 0) { ingresoFormError.textContent = 'Escribe un importe válido.'; return; }
+    if (!ingresoFechaInput.value) { ingresoFormError.textContent = 'Elige una fecha.'; return; }
+    ingresoFormError.textContent = '';
+
+    var payload = {
+      id: ingresoIdEditando,
+      concepto: concepto,
+      importe: importe,
+      frecuencia: ingresoFrecuenciaInput.value,
+      metodoPago: ingresoMetodoInput.value,
+      proximaFecha: ingresoFechaInput.value,
+      nota: ingresoNotaInput.value.trim(),
+      activo: ingresoActivoInput.checked,
+      variable: ingresoVariableInput.checked
+    };
+
+    ingresoSaveBtn.disabled = true;
+    guardarIngresoFijo(payload)
       .then(function () {
-        showToast('Ingresos fijos actualizados: ' + eur(importe));
+        showToast(ingresoIdEditando ? 'Ingreso fijo actualizado' : 'Ingreso fijo añadido');
+        resetIngresoFormulario();
         cargarResumen();
       })
       .catch(function (err) {
-        showToast(err.message || 'No se pudo guardar. Inténtalo de nuevo.');
+        ingresoFormError.textContent = err.message || 'No se pudo guardar.';
       })
       .then(function () {
-        ingresoFijoSaveBtn.disabled = false;
-        ingresoFijoSaveBtn.textContent = 'Guardar';
+        ingresoSaveBtn.disabled = false;
       });
   });
 
+  function borrarIngresoFijo(ing, btn) {
+    btn.disabled = true;
+    eliminarIngresoFijo(ing.id)
+      .then(function () {
+        showToast('Ingreso fijo eliminado');
+        if (ingresoIdEditando === ing.id) resetIngresoFormulario();
+        cargarResumen();
+      })
+      .catch(function (err) {
+        showToast(err.message || 'No se pudo borrar.');
+        btn.disabled = false;
+        btn.dataset.confirm = '0';
+        btn.textContent = 'Eliminar';
+      });
+  }
+
   function cargarResumen() {
-    Promise.all([getPerfil(), getMesesDropdown()])
+    Promise.all([getIngresosFijos(), getPerfil(), getPendientesIngresosFijos()])
       .then(function (res) {
-        var perfil = res[0], meses = res[1];
-        window.NOMINA_SUGERIDA = Number(perfil.nomina_base) || 0;
-        renderMeses(meses);
+        ingresosErrorNote.hidden = true;
+        renderIngresos(res[0]);
+        renderPendientes(res[2]);
+        var perfil = res[1];
         if (perfil.dinero_inicial === null || typeof perfil.dinero_inicial === 'undefined') {
           mostrarDineroInicialModal(true);
         }
       })
       .catch(function () {
-        showToast('No se pudo cargar los ingresos fijos.');
+        ingresosErrorNote.hidden = false;
       });
   }
 
