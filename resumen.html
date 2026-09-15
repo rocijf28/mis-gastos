@@ -50,6 +50,39 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="presupuestoModal" hidden>
+    <div class="modal-card">
+      <h2>Configurar presupuesto</h2>
+      <p class="modal-copy">Un límite total y, si quieres, límites por categoría. Te avisamos al llegar al 80% y al superarlos.</p>
+
+      <div class="field">
+        <label for="presupuestoTotalInput">Presupuesto total mensual</label>
+        <input type="number" inputmode="decimal" step="0.01" min="0" id="presupuestoTotalInput" placeholder="Ej. 1200 (déjalo en blanco para quitarlo)" />
+      </div>
+      <p class="form-error" id="presupuestoTotalError"></p>
+
+      <div class="fijo-form no-border">
+        <p class="fijo-form-title">Límites por categoría (opcional)</p>
+        <div id="presupuestoCategoriasList"></div>
+        <div class="two-col" style="margin-top:10px;">
+          <div class="field" style="margin-bottom:0;">
+            <select id="presupuestoCategoriaSelect" aria-label="Categoría"></select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <input type="number" inputmode="decimal" step="0.01" min="0" id="presupuestoCategoriaImporte" placeholder="Importe" aria-label="Importe del límite" />
+          </div>
+        </div>
+        <button type="button" class="mini-btn" id="presupuestoCategoriaAddBtn">Añadir límite</button>
+      </div>
+
+      <p class="form-error" id="presupuestoError"></p>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="submit-btn" id="presupuestoSaveBtn" type="button">Guardar</button>
+        <button class="link-btn" id="presupuestoCloseBtn" type="button">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <section class="card" id="statsCard">
     <div class="summary-head">
       <p class="eyebrow">Resumen del mes</p>
@@ -58,6 +91,15 @@
 
     <div class="stat-grid" id="statGrid"></div>
     <p class="error-note" id="statsErrorNote" hidden>No se pudo cargar el resumen. Recarga la página.</p>
+  </section>
+
+  <section class="card" id="presupuestoCard">
+    <div class="summary-head" style="display:flex; align-items:center; justify-content:space-between;">
+      <p class="eyebrow" style="margin:0;">Presupuesto mensual</p>
+      <button type="button" class="link-btn" id="presupuestoConfigBtn">Configurar</button>
+    </div>
+    <div id="presupuestoRows" style="margin-top:10px;"></div>
+    <p class="empty-note" id="presupuestoEmpty" hidden>Todavía no has configurado ningún presupuesto.</p>
   </section>
 
   <section class="card" id="necesarioCard">
@@ -100,7 +142,24 @@ var PAGINA_ACTUAL = 'resumen';
   var evolucionList = document.getElementById('evolucionList');
   var evolucionEmpty = document.getElementById('evolucionEmpty');
 
+  var presupuestoRows = document.getElementById('presupuestoRows');
+  var presupuestoEmpty = document.getElementById('presupuestoEmpty');
+  var presupuestoConfigBtn = document.getElementById('presupuestoConfigBtn');
+  var presupuestoModal = document.getElementById('presupuestoModal');
+  var presupuestoTotalInput = document.getElementById('presupuestoTotalInput');
+  var presupuestoTotalError = document.getElementById('presupuestoTotalError');
+  var presupuestoCategoriasList = document.getElementById('presupuestoCategoriasList');
+  var presupuestoCategoriaSelect = document.getElementById('presupuestoCategoriaSelect');
+  var presupuestoCategoriaImporte = document.getElementById('presupuestoCategoriaImporte');
+  var presupuestoCategoriaAddBtn = document.getElementById('presupuestoCategoriaAddBtn');
+  var presupuestoError = document.getElementById('presupuestoError');
+  var presupuestoSaveBtn = document.getElementById('presupuestoSaveBtn');
+  var presupuestoCloseBtn = document.getElementById('presupuestoCloseBtn');
+  poblarSelectCategorias(presupuestoCategoriaSelect);
+
   var dineroInicialActual = 0;
+  var resumenActualCache = null;
+  var presupuestosCategoriaModal = {};
 
   function signoClase(n) { return n > 0 ? 'good' : (n < 0 ? 'bad' : ''); }
 
@@ -153,6 +212,136 @@ var PAGINA_ACTUAL = 'resumen';
     statGrid.appendChild(crearStatBox('Gasto medio diario', eur(resumen.gastoMedioDiario)));
     statGrid.appendChild(crearStatBox('Mayor gasto del mes', eur(resumen.mayorGasto)));
   }
+
+  function filaPresupuesto(nombre, gastado, limite) {
+    var pct = Math.min(100, Math.round((gastado / limite) * 100));
+    var color = colorPresupuesto(gastado / limite);
+    var wrap = document.createElement('div');
+    wrap.style.marginBottom = '14px';
+    wrap.innerHTML =
+      '<div class="cat-row-label">' +
+        '<span class="name">' + nombre + '</span>' +
+        '<span class="value">' + eur(gastado) + ' / ' + eur(limite) + '</span>' +
+      '</div>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:' + Math.max(4, pct) + '%; background:var(--' + color + ')"></div></div>';
+    return wrap;
+  }
+
+  function renderPresupuesto(resumen) {
+    presupuestoRows.innerHTML = '';
+    var categorias = Object.keys(resumen.presupuestosCategoria || {});
+    var hayAlgo = !!resumen.presupuestoMensual || categorias.length > 0;
+    presupuestoEmpty.hidden = hayAlgo;
+    if (!hayAlgo) return;
+
+    if (resumen.presupuestoMensual) {
+      presupuestoRows.appendChild(filaPresupuesto('Total', resumen.totalMes, resumen.presupuestoMensual));
+    }
+    categorias.forEach(function (cat) {
+      presupuestoRows.appendChild(filaPresupuesto(cat, resumen.porCategoria[cat] || 0, resumen.presupuestosCategoria[cat]));
+    });
+  }
+
+  function renderPresupuestoCategoriasList(porCategoria) {
+    presupuestoCategoriasList.innerHTML = '';
+    Object.keys(porCategoria || {}).forEach(function (cat) {
+      var row = document.createElement('div');
+      row.className = 'fijo-row';
+      var info = document.createElement('div');
+      info.className = 'fijo-info';
+      info.innerHTML = '<p class="fijo-title">' + cat + '</p><p class="fijo-meta">' + eur(porCategoria[cat]) + '</p>';
+      var quitarBtn = document.createElement('button');
+      quitarBtn.type = 'button';
+      quitarBtn.className = 'link-btn danger';
+      quitarBtn.textContent = 'Quitar';
+      quitarBtn.addEventListener('click', function () {
+        quitarBtn.disabled = true;
+        eliminarPresupuestoCategoria(cat)
+          .then(function () {
+            delete porCategoria[cat];
+            renderPresupuestoCategoriasList(porCategoria);
+          })
+          .catch(function (err) {
+            presupuestoError.textContent = err.message || 'No se pudo quitar.';
+            quitarBtn.disabled = false;
+          });
+      });
+      row.appendChild(info);
+      row.appendChild(quitarBtn);
+      presupuestoCategoriasList.appendChild(row);
+    });
+  }
+
+  function abrirPresupuestoModal() {
+    presupuestoError.textContent = '';
+    presupuestoTotalError.textContent = '';
+    presupuestoTotalInput.value = (resumenActualCache && resumenActualCache.presupuestoMensual)
+      ? resumenActualCache.presupuestoMensual.toFixed(2) : '';
+    presupuestosCategoriaModal = {};
+    if (resumenActualCache && resumenActualCache.presupuestosCategoria) {
+      Object.keys(resumenActualCache.presupuestosCategoria).forEach(function (cat) {
+        presupuestosCategoriaModal[cat] = resumenActualCache.presupuestosCategoria[cat];
+      });
+    }
+    renderPresupuestoCategoriasList(presupuestosCategoriaModal);
+    presupuestoCategoriaImporte.value = '';
+    presupuestoModal.hidden = false;
+  }
+
+  presupuestoConfigBtn.addEventListener('click', abrirPresupuestoModal);
+  presupuestoCloseBtn.addEventListener('click', function () {
+    presupuestoModal.hidden = true;
+    cargarResumen();
+  });
+
+  presupuestoCategoriaAddBtn.addEventListener('click', function () {
+    var categoria = presupuestoCategoriaSelect.value;
+    var importe = parseFloat(presupuestoCategoriaImporte.value);
+    if (!importe || importe <= 0) {
+      presupuestoError.textContent = 'Escribe un importe válido para el límite de categoría.';
+      return;
+    }
+    presupuestoError.textContent = '';
+    presupuestoCategoriaAddBtn.disabled = true;
+    guardarPresupuestoCategoria(categoria, importe)
+      .then(function () {
+        presupuestosCategoriaModal[categoria] = importe;
+        renderPresupuestoCategoriasList(presupuestosCategoriaModal);
+        presupuestoCategoriaImporte.value = '';
+      })
+      .catch(function (err) {
+        presupuestoError.textContent = err.message || 'No se pudo guardar el límite.';
+      })
+      .then(function () {
+        presupuestoCategoriaAddBtn.disabled = false;
+      });
+  });
+
+  presupuestoSaveBtn.addEventListener('click', function () {
+    var valor = presupuestoTotalInput.value;
+    var importe = valor === '' ? null : parseFloat(valor);
+    if (valor !== '' && (isNaN(importe) || importe < 0)) {
+      presupuestoTotalError.textContent = 'Escribe un importe válido (o déjalo en blanco para quitar el presupuesto).';
+      return;
+    }
+    presupuestoTotalError.textContent = '';
+    presupuestoSaveBtn.disabled = true;
+    presupuestoSaveBtn.textContent = 'Guardando…';
+
+    guardarPresupuestoMensual(importe)
+      .then(function () {
+        showToast('Presupuesto guardado');
+        presupuestoModal.hidden = true;
+        cargarResumen();
+      })
+      .catch(function (err) {
+        presupuestoTotalError.textContent = err.message || 'No se pudo guardar. Inténtalo de nuevo.';
+      })
+      .then(function () {
+        presupuestoSaveBtn.disabled = false;
+        presupuestoSaveBtn.textContent = 'Guardar';
+      });
+  });
 
   function renderNecesarioPrescindible(necesarioMes, prescindibleMes) {
     necesarioRows.innerHTML = '';
@@ -252,7 +441,9 @@ var PAGINA_ACTUAL = 'resumen';
       .then(function (res) {
         var resumen = res[0], evoSaldo = res[1];
         resumen.saldoTotal = evoSaldo.saldoTotal;
+        resumenActualCache = resumen;
         renderStats(resumen);
+        renderPresupuesto(resumen);
         renderNecesarioPrescindible(resumen.necesarioMes, resumen.prescindibleMes);
         renderCategorias(resumen.porCategoria);
         renderEvolucion(evoSaldo.evolucion);
