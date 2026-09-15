@@ -189,11 +189,26 @@ var PAGINA_ACTUAL = 'registrar';
       ? addIngreso({ fecha: dateInput.value, importe: importe, concepto: concepto })
       : addGasto({ fecha: dateInput.value, categoria: selectedCategory, importe: importe, metodoPago: methodInput.value, nota: concepto, tipoGasto: tipoGastoInput.value || null });
 
+    var categoriaGuardada = selectedCategory;
+    var fechaGuardada = dateInput.value;
+
     promesa
       .then(function () {
-        showToast((esIngreso ? 'Ingreso añadido: ' : 'Gasto añadido: ') + eur(importe));
+        var mensajeBase = (esIngreso ? 'Ingreso añadido: ' : 'Gasto añadido: ') + eur(importe);
         amountInput.value = '';
         noteInput.value = '';
+
+        if (esIngreso || fechaGuardada.slice(0, 7) !== hoyISO().slice(0, 7)) {
+          showToast(mensajeBase);
+          return;
+        }
+
+        return comprobarAvisosPresupuesto([
+          { categoria: null, delta: importe },
+          { categoria: categoriaGuardada, delta: importe }
+        ])
+          .then(function (avisos) { showToast([mensajeBase].concat(avisos).join(' · ')); })
+          .catch(function () { showToast(mensajeBase); });
       })
       .catch(function (err) {
         showToast(err.message || 'No se pudo guardar. Inténtalo de nuevo.');
