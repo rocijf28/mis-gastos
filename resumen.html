@@ -31,6 +31,7 @@
     <a class="nav-link" data-page="fijos" href="gastos-fijos.html">Gastos fijos</a>
     <a class="nav-link" data-page="ingresos-fijos" href="ingresos-fijos.html">Ingresos fijos</a>
     <a class="nav-link" data-page="resumen" href="resumen.html">Resumen</a>
+    <a class="nav-link" data-page="anomalias" href="anomalias.html">Anomalías</a>
   </nav>
 
   <div class="modal-overlay" id="dineroInicialModal" hidden>
@@ -57,6 +58,13 @@
 
     <div class="stat-grid" id="statGrid"></div>
     <p class="error-note" id="statsErrorNote" hidden>No se pudo cargar el resumen. Recarga la página.</p>
+  </section>
+
+  <section class="card" id="necesarioCard">
+    <p class="eyebrow" style="margin-bottom:4px;">Necesario vs. prescindible (mes actual)</p>
+    <p class="hint" style="margin:0 0 12px;">En "prescindible" está tu verdadera capacidad de ahorro.</p>
+    <div class="cat-rows" id="necesarioRows"></div>
+    <p class="empty-note" id="necesarioEmpty" hidden>Aún no has registrado gastos este mes.</p>
   </section>
 
   <section class="card" id="categoriaCard">
@@ -87,6 +95,8 @@ var PAGINA_ACTUAL = 'resumen';
   var statsErrorNote = document.getElementById('statsErrorNote');
   var catRows = document.getElementById('catRows');
   var catEmpty = document.getElementById('catEmpty');
+  var necesarioRows = document.getElementById('necesarioRows');
+  var necesarioEmpty = document.getElementById('necesarioEmpty');
   var evolucionList = document.getElementById('evolucionList');
   var evolucionEmpty = document.getElementById('evolucionEmpty');
 
@@ -142,6 +152,28 @@ var PAGINA_ACTUAL = 'resumen';
     statGrid.appendChild(crearStatBox('% ahorrado', (resumen.pctAhorroMes * 100).toFixed(1) + ' %', signoClase(resumen.ahorroMes)));
     statGrid.appendChild(crearStatBox('Gasto medio diario', eur(resumen.gastoMedioDiario)));
     statGrid.appendChild(crearStatBox('Mayor gasto del mes', eur(resumen.mayorGasto)));
+  }
+
+  function renderNecesarioPrescindible(necesarioMes, prescindibleMes) {
+    necesarioRows.innerHTML = '';
+    var total = necesarioMes + prescindibleMes;
+    necesarioEmpty.hidden = total > 0;
+    if (total <= 0) return;
+
+    [
+      { name: 'Necesario', value: necesarioMes, color: 'var(--good)' },
+      { name: 'Prescindible', value: prescindibleMes, color: 'var(--accent)' }
+    ].forEach(function (entry) {
+      var pct = Math.round((entry.value / total) * 100);
+      var wrap = document.createElement('div');
+      wrap.innerHTML =
+        '<div class="cat-row-label">' +
+          '<span class="name"><span class="cat-dot" style="background:' + entry.color + '"></span>' + entry.name + '</span>' +
+          '<span class="value">' + eur(entry.value) + ' · ' + pct + '%</span>' +
+        '</div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + Math.max(4, pct) + '%; background:' + entry.color + '"></div></div>';
+      necesarioRows.appendChild(wrap);
+    });
   }
 
   function renderCategorias(porCategoria) {
@@ -219,6 +251,7 @@ var PAGINA_ACTUAL = 'resumen';
         var resumen = res[0], evoSaldo = res[1];
         resumen.saldoTotal = evoSaldo.saldoTotal;
         renderStats(resumen);
+        renderNecesarioPrescindible(resumen.necesarioMes, resumen.prescindibleMes);
         renderCategorias(resumen.porCategoria);
         renderEvolucion(evoSaldo.evolucion);
         if (resumen.dineroInicialPendiente) mostrarDineroInicialModal(true);
