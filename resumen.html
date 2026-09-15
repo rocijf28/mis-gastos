@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mis Gastos — Resumen</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1e2a1d">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mis Gastos">
+</head>
+<body>
+
+<div class="shell">
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Libro de gastos</p>
+      <h1>Resumen</h1>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="link-btn" id="logoutBtn">Salir</button>
+    </div>
+  </header>
+
+  <nav class="nav-bar" role="navigation" aria-label="Navegación de la app">
+    <a class="nav-link" data-page="registrar" href="index.html">Registrar</a>
+    <a class="nav-link" data-page="movimientos" href="movimientos.html">Movimientos</a>
+    <a class="nav-link" data-page="fijos" href="gastos-fijos.html">Gastos fijos</a>
+    <a class="nav-link" data-page="resumen" href="resumen.html">Resumen</a>
+  </nav>
+
+  <div class="modal-overlay" id="dineroInicialModal" hidden>
+    <div class="modal-card">
+      <h2 id="dineroInicialTitulo">¿De cuánto partes?</h2>
+      <p class="modal-copy" id="dineroInicialCopy">Antes de empezar, dinos cuánto dinero tienes ahora mismo ahorrado. Así el "Saldo total" será correcto desde el primer día.</p>
+      <div class="amount-row">
+        <span class="currency">€</span>
+        <input type="number" inputmode="decimal" step="0.01" min="0" id="dineroInicialInput" placeholder="0,00" aria-label="Dinero inicial en euros" />
+      </div>
+      <p class="form-error" id="dineroInicialError"></p>
+      <div class="modal-actions">
+        <button class="submit-btn" id="dineroInicialSaveBtn" type="button">Empezar</button>
+        <button class="link-btn" id="dineroInicialCancelBtn" type="button" hidden>Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="card" id="statsCard">
+    <div class="summary-head">
+      <p class="eyebrow">Resumen del mes</p>
+      <p class="summary-month" id="summaryMonth"></p>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+    <p class="error-note" id="statsErrorNote" hidden>No se pudo cargar el resumen. Recarga la página.</p>
+  </section>
+
+  <section class="card" id="categoriaCard">
+    <p class="eyebrow" style="margin-bottom:4px;">Gasto por categoría (mes actual)</p>
+    <div class="cat-rows" id="catRows" style="margin-top:14px;"></div>
+    <p class="empty-note" id="catEmpty" hidden>Aún no has registrado gastos este mes.</p>
+  </section>
+
+  <section class="card" id="evolucionCard">
+    <p class="eyebrow" style="margin-bottom:12px;">Evolución mensual</p>
+    <div id="evolucionList"></div>
+    <p class="empty-note" id="evolucionEmpty" hidden>Todavía no hay meses con datos.</p>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script src="data.js"></script>
+<script>
+var PAGINA_ACTUAL = 'resumen';
+(function () {
+  'use strict';
+
+  var statGrid = document.getElementById('statGrid');
+  var statsErrorNote = document.getElementById('statsErrorNote');
+  var catRows = document.getElementById('catRows');
+  var catEmpty = document.getElementById('catEmpty');
+  var evolucionList = document.getElementById('evolucionList');
+  var evolucionEmpty = document.getElementById('evolucionEmpty');
+
+  var dineroInicialActual = 0;
+
+  function signoClase(n) { return n > 0 ? 'good' : (n < 0 ? 'bad' : ''); }
+
+  function crearStatBox(label, valorTexto, clase, ancha) {
+    var box = document.createElement('div');
+    box.className = 'stat-box' + (ancha ? ' wide' : '');
+    var labelEl = document.createElement('p');
+    labelEl.className = 'stat-label';
+    labelEl.textContent = label;
+    var valorEl = document.createElement('p');
+    valorEl.className = 'stat-value' + (clase ? ' ' + clase : '');
+    valorEl.textContent = valorTexto;
+    if (ancha) {
+      var left = document.createElement('div');
+      left.appendChild(labelEl);
+      left.appendChild(valorEl);
+      box.appendChild(left);
+    } else {
+      box.appendChild(labelEl);
+      box.appendChild(valorEl);
+    }
+    return box;
+  }
+
+  function renderStats(resumen) {
+    statGrid.innerHTML = '';
+    if (!resumen) {
+      statsErrorNote.hidden = false;
+      return;
+    }
+    statsErrorNote.hidden = true;
+    dineroInicialActual = resumen.dineroInicial;
+
+    var saldoBox = crearStatBox('Saldo total', eur(resumen.saldoTotal), signoClase(resumen.saldoTotal), true);
+    var editarBtn = document.createElement('button');
+    editarBtn.type = 'button';
+    editarBtn.className = 'link-btn';
+    editarBtn.textContent = 'Corregir dinero inicial';
+    editarBtn.addEventListener('click', function () {
+      mostrarDineroInicialModal(false, dineroInicialActual);
+    });
+    saldoBox.appendChild(editarBtn);
+    statGrid.appendChild(saldoBox);
+
+    statGrid.appendChild(crearStatBox('Dinero inicial', eur(resumen.dineroInicial)));
+    statGrid.appendChild(crearStatBox('Gastos este mes', eur(resumen.totalMes)));
+    statGrid.appendChild(crearStatBox('Ingresos este mes', eur(resumen.ingresosMes)));
+    statGrid.appendChild(crearStatBox('Ahorro este mes', eur(resumen.ahorroMes), signoClase(resumen.ahorroMes)));
+    statGrid.appendChild(crearStatBox('% ahorrado', (resumen.pctAhorroMes * 100).toFixed(1) + ' %', signoClase(resumen.ahorroMes)));
+    statGrid.appendChild(crearStatBox('Gasto medio diario', eur(resumen.gastoMedioDiario)));
+    statGrid.appendChild(crearStatBox('Mayor gasto del mes', eur(resumen.mayorGasto)));
+  }
+
+  function renderCategorias(porCategoria) {
+    catRows.innerHTML = '';
+    porCategoria = porCategoria || {};
+    var entries = Object.keys(porCategoria)
+      .map(function (k) { return { name: k, value: porCategoria[k] }; })
+      .filter(function (e) { return e.value > 0; })
+      .sort(function (a, b) { return b.value - a.value; });
+
+    catEmpty.hidden = entries.length > 0;
+
+    var max = entries.length ? entries[0].value : 0;
+    entries.forEach(function (entry) {
+      var cat = catById[entry.name];
+      var color = cat ? 'var(' + cat.varName + ')' : 'var(--ink-muted)';
+      var pct = max > 0 ? Math.max(4, Math.round((entry.value / max) * 100)) : 0;
+
+      var wrap = document.createElement('div');
+      wrap.innerHTML =
+        '<div class="cat-row-label">' +
+          '<span class="name"><span class="cat-dot" style="background:' + color + '"></span>' + entry.name + '</span>' +
+          '<span class="value">' + eur(entry.value) + '</span>' +
+        '</div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%; background:' + color + '"></div></div>';
+      catRows.appendChild(wrap);
+    });
+  }
+
+  function renderEvolucion(evolucion) {
+    evolucionList.innerHTML = '';
+    evolucion = evolucion || [];
+    evolucionEmpty.hidden = evolucion.length > 0;
+
+    function crearItem(label, valorTexto, clase) {
+      var item = document.createElement('div');
+      item.className = 'item';
+      var labelEl = document.createElement('span');
+      labelEl.className = 'item-label';
+      labelEl.textContent = label;
+      var valorEl = document.createElement('span');
+      valorEl.className = 'item-value' + (clase ? ' ' + clase : '');
+      valorEl.textContent = valorTexto;
+      item.appendChild(labelEl);
+      item.appendChild(valorEl);
+      return item;
+    }
+
+    evolucion.forEach(function (mes) {
+      var row = document.createElement('div');
+      row.className = 'evo-row';
+
+      var mesEl = document.createElement('p');
+      mesEl.className = 'evo-month';
+      mesEl.textContent = mes.etiqueta;
+
+      var figuras = document.createElement('div');
+      figuras.className = 'evo-figures';
+      figuras.appendChild(crearItem('Ingresos', eur(mes.ingresosTotales)));
+      figuras.appendChild(crearItem('Gastos', eur(mes.gastos)));
+      figuras.appendChild(crearItem('Ahorro', eur(mes.ahorro), 'ahorro ' + signoClase(mes.ahorro)));
+
+      row.appendChild(mesEl);
+      row.appendChild(figuras);
+      evolucionList.appendChild(row);
+    });
+  }
+
+  function cargarResumen() {
+    document.getElementById('summaryMonth').textContent =
+      new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+
+    Promise.all([getResumenActual(), getEvolucionYSaldo()])
+      .then(function (res) {
+        var resumen = res[0], evoSaldo = res[1];
+        resumen.saldoTotal = evoSaldo.saldoTotal;
+        renderStats(resumen);
+        renderCategorias(resumen.porCategoria);
+        renderEvolucion(evoSaldo.evolucion);
+        if (resumen.dineroInicialPendiente) mostrarDineroInicialModal(true);
+      })
+      .catch(function () {
+        statsErrorNote.hidden = false;
+      });
+  }
+
+  exigirSesion().then(function () {
+    initNav();
+    initDineroInicialModal(function () { cargarResumen(); });
+    cargarResumen();
+  });
+})();
+</script>
+</body>
+</html>

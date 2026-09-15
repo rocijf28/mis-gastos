@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mis Gastos — Entrar</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1e2a1d">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mis Gastos">
+</head>
+<body>
+
+<div class="login-wrap">
+  <p class="login-logo">Mis Gastos</p>
+
+  <section class="card">
+    <p class="card-title">Entrar</p>
+
+    <div class="field">
+      <label for="emailInput">Correo</label>
+      <input type="email" id="emailInput" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label for="passwordInput">Contraseña</label>
+      <input type="password" id="passwordInput" autocomplete="current-password" />
+    </div>
+
+    <p class="form-error" id="loginError"></p>
+    <button class="submit-btn" id="loginBtn" type="button">Entrar</button>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+  var supabaseClient = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+
+  var emailInput = document.getElementById('emailInput');
+  var passwordInput = document.getElementById('passwordInput');
+  var loginError = document.getElementById('loginError');
+  var loginBtn = document.getElementById('loginBtn');
+
+  function intentarEntrar() {
+    var email = emailInput.value.trim();
+    var password = passwordInput.value;
+    if (!email || !password) {
+      loginError.textContent = 'Escribe tu correo y tu contraseña.';
+      return;
+    }
+    loginError.textContent = '';
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Entrando…';
+
+    supabaseClient.auth.signInWithPassword({ email: email, password: password })
+      .then(function (res) {
+        if (res.error) throw new Error(res.error.message);
+        window.location.href = 'index.html';
+      })
+      .catch(function (err) {
+        loginError.textContent = 'No se pudo entrar: correo o contraseña incorrectos.';
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Entrar';
+      });
+  }
+
+  loginBtn.addEventListener('click', intentarEntrar);
+  passwordInput.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') intentarEntrar(); });
+
+  // Si ya hay sesión iniciada, no hace falta pasar por aquí
+  supabaseClient.auth.getSession().then(function (res) {
+    if (res.data && res.data.session) window.location.href = 'index.html';
+  });
+</script>
+</body>
+</html>
