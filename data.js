@@ -118,7 +118,7 @@ function getMovimientos(limite) {
         metodoPago: g.metodo_pago || '', nota: g.nota || '', importe: Number(g.importe) };
     });
     var ingresos = (lanzarSiError_(res[1]) || []).map(function (i) {
-      return { tipo: 'ingreso', id: i.id, fecha: i.fecha, titulo: i.concepto || 'Ingreso puntual',
+      return { tipo: 'ingreso', id: i.id, fecha: i.fecha, titulo: i.concepto || 'Ingreso',
         nota: '', importe: Number(i.importe) };
     });
     var todos = gastos.concat(ingresos);
@@ -161,7 +161,7 @@ function addGasto(datos) {
 function addIngreso(datos) {
   return currentUserId_().then(function (uid) {
     return supabaseClient.from('ingresos').insert({
-      user_id: uid, fecha: datos.fecha, concepto: datos.concepto || 'Ingreso puntual',
+      user_id: uid, fecha: datos.fecha, concepto: datos.concepto || 'Ingreso',
       importe: datos.importe
     }).then(lanzarSiError_);
   });
