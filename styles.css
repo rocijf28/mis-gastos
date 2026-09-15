@@ -12,6 +12,7 @@
     --accent-ink-on: #fbf3ee;
     --good: #2f6b3d;
     --bad: #b8452c;
+    --warn: #a1791f;
     --focus: #3d6b8a;
 
     --cat-alimentacion: #6b8e4e;
@@ -44,6 +45,7 @@
       --accent-ink-on: #241009;
       --good: #74c785;
       --bad: #e2825d;
+      --warn: #d8b158;
       --focus: #7fb2d4;
 
       --cat-alimentacion: #93c26c;
@@ -581,6 +583,9 @@
   }
   .stat-value.good { color: var(--good); }
   .stat-value.bad { color: var(--bad); }
+  .stat-value.warn { color: var(--warn); }
+
+  .link-btn.danger { color: var(--bad); }
 
   .evo-row {
     display: flex;
