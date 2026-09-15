@@ -268,9 +268,51 @@ var PAGINA_ACTUAL = 'movimientos';
 
       editarMovimiento(payload)
         .then(function () {
-          showToast('Movimiento actualizado');
           idEditando = null;
-          cargarResumen();
+
+          if (mov.tipo !== 'gasto') {
+            showToast('Movimiento actualizado');
+            cargarResumen();
+            return;
+          }
+
+          // Delta de esta acción concreta sobre el mes actual, teniendo en
+          // cuenta que la fecha y/o la categoría pueden haber cambiado:
+          // si el movimiento entra o sale del mes actual, o cambia de
+          // categoría, el "antes" y el "después" de cada dimensión no son
+          // simplemente la diferencia de importe.
+          var mesActual = hoyISO().slice(0, 7);
+          var mesAntes = mov.fecha.slice(0, 7);
+          var mesDespues = nuevaFecha.slice(0, 7);
+          var categoriaAntes = mov.titulo;
+          var categoriaDespues = payload.categoria;
+
+          var cambios = [];
+          var deltaTotal = 0;
+          if (mesAntes === mesActual) deltaTotal -= mov.importe;
+          if (mesDespues === mesActual) deltaTotal += nuevoImporte;
+          if (deltaTotal) cambios.push({ categoria: null, delta: deltaTotal });
+
+          if (categoriaAntes === categoriaDespues) {
+            var deltaCat = 0;
+            if (mesAntes === mesActual) deltaCat -= mov.importe;
+            if (mesDespues === mesActual) deltaCat += nuevoImporte;
+            if (deltaCat) cambios.push({ categoria: categoriaDespues, delta: deltaCat });
+          } else if (mesDespues === mesActual) {
+            // Cambia de categoría: la antigua solo puede bajar este mes (no
+            // cruza umbrales hacia arriba, así que no hace falta mirarla).
+            cambios.push({ categoria: categoriaDespues, delta: nuevoImporte });
+          }
+
+          return comprobarAvisosPresupuesto(cambios)
+            .then(function (avisos) {
+              showToast(['Movimiento actualizado'].concat(avisos).join(' · '));
+              cargarResumen();
+            })
+            .catch(function () {
+              showToast('Movimiento actualizado');
+              cargarResumen();
+            });
         })
         .catch(function (err) {
           errorP.textContent = err.message || 'No se pudo guardar.';
