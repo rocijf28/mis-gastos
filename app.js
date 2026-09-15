@@ -25,11 +25,21 @@ var NECESARIO_POR_DEFECTO = {
   'Vivienda': true,
   'Servicios': true,
   'Salud': true,
-  'Otros': true,
+  'Otros': false,
   'Ocio': false,
   'Compras': false,
   'Suscripciones': false
 };
+
+// Lista de nombres de categorías (en el orden de CATEGORIES) que son
+// "necesario" o "prescindible" por defecto — usado en la página Resumen
+// para explicarle al usuario qué categorías entran en cada grupo.
+function categoriasPorDefecto(tipo) {
+  return CATEGORIES
+    .filter(function (c) { return (NECESARIO_POR_DEFECTO[c.id] ? 'necesario' : 'prescindible') === tipo; })
+    .map(function (c) { return c.id; })
+    .join(', ');
+}
 
 // Métodos de pago para gastos/ingresos sueltos y para el desplegable de
 // "Movimientos". "Domiciliación" no aparece aquí a propósito: solo tiene
