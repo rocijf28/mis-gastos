@@ -31,6 +31,7 @@
     <a class="nav-link" data-page="fijos" href="gastos-fijos.html">Gastos fijos</a>
     <a class="nav-link" data-page="ingresos-fijos" href="ingresos-fijos.html">Ingresos fijos</a>
     <a class="nav-link" data-page="resumen" href="resumen.html">Resumen</a>
+    <a class="nav-link" data-page="anomalias" href="anomalias.html">Anomalías</a>
   </nav>
 
   <div class="modal-overlay" id="dineroInicialModal" hidden>
@@ -49,13 +50,23 @@
     </div>
   </div>
 
-  <section class="card" id="fijosCard">
-    <p class="eyebrow" style="margin-bottom:12px;">Tus gastos fijos</p>
-    <div id="fijosList"></div>
-    <p class="empty-note" id="fijosEmpty" hidden>Aún no tienes gastos fijos configurados.</p>
-    <p class="error-note" id="fijosErrorNote" hidden>No se pudo cargar. Recarga la página.</p>
+  <section class="card pendientes-card" id="pendientesCard" hidden>
+    <p class="eyebrow" style="margin-bottom:10px;">Toca confirmar el importe</p>
+    <div id="pendientesList"></div>
+  </section>
 
-    <div class="fijo-form no-border">
+  <section class="card" id="fijosCard">
+    <button type="button" class="collapsible-header" id="fijosToggle" aria-expanded="false" aria-controls="fijosBody">
+      <p class="eyebrow" style="margin:0;">Tus gastos fijos</p>
+      <span class="collapsible-chevron" aria-hidden="true">▾</span>
+    </button>
+    <div class="collapsible-body" id="fijosBody" hidden>
+      <div id="fijosList"></div>
+      <p class="empty-note" id="fijosEmpty" hidden>Aún no tienes gastos fijos configurados.</p>
+      <p class="error-note" id="fijosErrorNote" hidden>No se pudo cargar. Recarga la página.</p>
+    </div>
+
+    <div class="fijo-form">
       <p class="fijo-form-title" id="fijoFormTitle">Añadir gasto fijo</p>
 
       <div class="field">
@@ -69,7 +80,7 @@
           <select id="fijoCategoriaInput"></select>
         </div>
         <div class="field">
-          <label for="fijoImporteInput">Importe</label>
+          <label for="fijoImporteInput" id="fijoImporteLabel">Importe</label>
           <input type="number" inputmode="decimal" step="0.01" min="0" id="fijoImporteInput" placeholder="0,00" />
         </div>
       </div>
@@ -91,6 +102,11 @@
       </div>
 
       <div class="field">
+        <label for="fijoTipoGastoInput">Necesario / prescindible</label>
+        <select id="fijoTipoGastoInput"></select>
+      </div>
+
+      <div class="field">
         <label for="fijoNotaInput">Nota (opcional)</label>
         <input type="text" id="fijoNotaInput" placeholder="Opcional" maxlength="120" />
       </div>
@@ -98,6 +114,11 @@
       <div class="checkbox-row">
         <input type="checkbox" id="fijoActivoInput" checked />
         <label for="fijoActivoInput">Activo (se añadirá solo a Gastos cuando toque)</label>
+      </div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="fijoVariableInput" />
+        <label for="fijoVariableInput">Importe variable (luz, agua...): te avisaremos para que confirmes el importe real cada vez, en vez de añadirlo solo</label>
       </div>
 
       <p class="form-error" id="fijoFormError"></p>
@@ -124,24 +145,98 @@ var PAGINA_ACTUAL = 'fijos';
   var fijosList = document.getElementById('fijosList');
   var fijosEmpty = document.getElementById('fijosEmpty');
   var fijosErrorNote = document.getElementById('fijosErrorNote');
+  var fijosToggle = document.getElementById('fijosToggle');
+  var fijosBody = document.getElementById('fijosBody');
   var fijoConceptoInput = document.getElementById('fijoConceptoInput');
   var fijoCategoriaInput = document.getElementById('fijoCategoriaInput');
   var fijoImporteInput = document.getElementById('fijoImporteInput');
+  var fijoImporteLabel = document.getElementById('fijoImporteLabel');
   var fijoFrecuenciaInput = document.getElementById('fijoFrecuenciaInput');
   var fijoMetodoInput = document.getElementById('fijoMetodoInput');
   var fijoFechaInput = document.getElementById('fijoFechaInput');
+  var fijoTipoGastoInput = document.getElementById('fijoTipoGastoInput');
   var fijoNotaInput = document.getElementById('fijoNotaInput');
   var fijoActivoInput = document.getElementById('fijoActivoInput');
+  var fijoVariableInput = document.getElementById('fijoVariableInput');
   var fijoFormError = document.getElementById('fijoFormError');
   var fijoFormTitle = document.getElementById('fijoFormTitle');
   var fijoSaveBtn = document.getElementById('fijoSaveBtn');
   var fijoCancelBtn = document.getElementById('fijoCancelBtn');
+  var pendientesCard = document.getElementById('pendientesCard');
+  var pendientesList = document.getElementById('pendientesList');
   var fijoIdEditando = null;
 
   poblarSelectCategorias(fijoCategoriaInput);
   poblarSelectFrecuencias(fijoFrecuenciaInput);
-  poblarSelectMetodos(fijoMetodoInput);
+  poblarSelectMetodosFijos(fijoMetodoInput);
+  poblarSelectTipoGasto(fijoTipoGastoInput);
   fijoFechaInput.value = hoyISO();
+
+  fijosToggle.addEventListener('click', function () {
+    var expandido = fijosToggle.getAttribute('aria-expanded') === 'true';
+    fijosToggle.setAttribute('aria-expanded', String(!expandido));
+    fijosBody.hidden = expandido;
+  });
+
+  fijoVariableInput.addEventListener('change', function () {
+    fijoImporteLabel.textContent = fijoVariableInput.checked ? 'Importe orientativo' : 'Importe';
+  });
+
+  function renderPendientes(pendientes) {
+    pendientesList.innerHTML = '';
+    pendientes = pendientes || [];
+    pendientesCard.hidden = pendientes.length === 0;
+
+    pendientes.forEach(function (p) {
+      var row = document.createElement('div');
+      row.className = 'pendiente-row';
+
+      var info = document.createElement('div');
+      info.className = 'pendiente-info';
+      var titleEl = document.createElement('p');
+      titleEl.className = 'pendiente-title';
+      titleEl.textContent = p.concepto;
+      var metaEl = document.createElement('p');
+      metaEl.className = 'pendiente-meta';
+      metaEl.textContent = p.categoria + ' · ' + formatearFechaCorta(p.proximaFecha) +
+        (p.retraso > 0 ? ' · y ' + p.retraso + (p.retraso === 1 ? ' mes más pendiente' : ' meses más pendientes') : '');
+      info.appendChild(titleEl);
+      info.appendChild(metaEl);
+
+      var form = document.createElement('div');
+      form.className = 'pendiente-form';
+      var importeInput = document.createElement('input');
+      importeInput.type = 'number';
+      importeInput.inputMode = 'decimal';
+      importeInput.step = '0.01';
+      importeInput.min = '0';
+      importeInput.placeholder = '0,00';
+      var confirmBtn = document.createElement('button');
+      confirmBtn.type = 'button';
+      confirmBtn.className = 'mini-btn';
+      confirmBtn.textContent = 'Confirmar';
+      confirmBtn.addEventListener('click', function () {
+        var importe = parseFloat(importeInput.value);
+        if (!importe || importe <= 0) { showToast('Escribe un importe válido.'); return; }
+        confirmBtn.disabled = true;
+        confirmarGastoFijoVariable(p.id, importe)
+          .then(function () {
+            showToast(p.concepto + ' confirmado: ' + eur(importe));
+            cargarResumen();
+          })
+          .catch(function (err) {
+            showToast(err.message || 'No se pudo confirmar.');
+            confirmBtn.disabled = false;
+          });
+      });
+
+      form.appendChild(importeInput);
+      form.appendChild(confirmBtn);
+      row.appendChild(info);
+      row.appendChild(form);
+      pendientesList.appendChild(row);
+    });
+  }
 
   function renderFijos(fijos) {
     fijosList.innerHTML = '';
@@ -160,7 +255,8 @@ var PAGINA_ACTUAL = 'fijos';
       var metaEl = document.createElement('p');
       metaEl.className = 'fijo-meta';
       metaEl.textContent = fijo.categoria + ' · ' + fijo.frecuencia + ' · próximo ' +
-        formatearFechaCorta(fijo.proximaFecha) + (fijo.activo ? '' : ' · pausado');
+        formatearFechaCorta(fijo.proximaFecha) + (fijo.variable ? ' · variable' : '') +
+        (fijo.activo ? '' : ' · pausado');
       var amountEl = document.createElement('p');
       amountEl.className = 'fijo-amount';
       amountEl.textContent = eur(fijo.importe);
@@ -212,8 +308,11 @@ var PAGINA_ACTUAL = 'fijos';
     fijoFrecuenciaInput.value = fijo.frecuencia;
     fijoMetodoInput.value = fijo.metodoPago;
     fijoFechaInput.value = fijo.proximaFecha;
+    fijoTipoGastoInput.value = fijo.tipoGasto || '';
     fijoNotaInput.value = fijo.nota;
     fijoActivoInput.checked = !!fijo.activo;
+    fijoVariableInput.checked = !!fijo.variable;
+    fijoImporteLabel.textContent = fijo.variable ? 'Importe orientativo' : 'Importe';
     fijoFormTitle.textContent = 'Editar gasto fijo';
     fijoSaveBtn.textContent = 'Guardar cambios';
     fijoCancelBtn.hidden = false;
@@ -229,8 +328,11 @@ var PAGINA_ACTUAL = 'fijos';
     fijoFrecuenciaInput.selectedIndex = 0;
     fijoMetodoInput.selectedIndex = 0;
     fijoFechaInput.value = hoyISO();
+    fijoTipoGastoInput.selectedIndex = 0;
     fijoNotaInput.value = '';
     fijoActivoInput.checked = true;
+    fijoVariableInput.checked = false;
+    fijoImporteLabel.textContent = 'Importe';
     fijoFormTitle.textContent = 'Añadir gasto fijo';
     fijoSaveBtn.textContent = 'Añadir';
     fijoCancelBtn.hidden = true;
@@ -256,8 +358,10 @@ var PAGINA_ACTUAL = 'fijos';
       frecuencia: fijoFrecuenciaInput.value,
       metodoPago: fijoMetodoInput.value,
       proximaFecha: fijoFechaInput.value,
+      tipoGasto: fijoTipoGastoInput.value || null,
       nota: fijoNotaInput.value.trim(),
-      activo: fijoActivoInput.checked
+      activo: fijoActivoInput.checked,
+      variable: fijoVariableInput.checked
     };
 
     fijoSaveBtn.disabled = true;
@@ -292,10 +396,11 @@ var PAGINA_ACTUAL = 'fijos';
   }
 
   function cargarResumen() {
-    Promise.all([getGastosFijos(), getPerfil()])
+    Promise.all([getGastosFijos(), getPerfil(), getPendientesGastosFijos()])
       .then(function (res) {
         fijosErrorNote.hidden = true;
         renderFijos(res[0]);
+        renderPendientes(res[2]);
         var perfil = res[1];
         if (perfil.dinero_inicial === null || typeof perfil.dinero_inicial === 'undefined') {
           mostrarDineroInicialModal(true);
