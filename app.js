@@ -64,6 +64,45 @@ function tipoEfectivo(categoria, tipoGasto) {
   return NECESARIO_POR_DEFECTO[categoria] ? 'necesario' : 'prescindible';
 }
 
+// --- Presupuesto mensual: solo lógica pura de umbrales/colores/mensajes.
+// El cálculo de "cuánto llevas gastado" vive en data.js (getResumenActual /
+// comprobarAvisosPresupuesto), que es quien conoce los totales reales. ---
+var PRESUPUESTO_UMBRAL_AVISO = 0.8;
+
+// Compara el gasto de "antes" y "después" de la acción que se acaba de
+// hacer (añadir o editar un gasto) contra un límite, y dice si ESA
+// acción concreta ha hecho cruzar hacia arriba el 80% o el 100% del
+// límite. Solo avisa al subir (nunca al bajar un gasto o borrar uno),
+// para no repetir el aviso cada vez que se recarga la página.
+function cruzarUmbralPresupuesto(antes, despues, limite) {
+  if (!limite || limite <= 0) return null;
+  if (despues <= antes) return null;
+  var umbralAviso = limite * PRESUPUESTO_UMBRAL_AVISO;
+  if (antes < limite && despues >= limite) return 'pasado';
+  if (antes < umbralAviso && despues >= umbralAviso) return 'aviso';
+  return null;
+}
+
+function etiquetaPresupuesto(categoria) {
+  return categoria ? 'en ' + categoria : 'del mes';
+}
+
+function mensajeAvisoPresupuesto(cruce, categoria, despues, limite) {
+  var etiqueta = etiquetaPresupuesto(categoria);
+  if (cruce === 'pasado') return 'Has superado tu presupuesto ' + etiqueta + ': ' + eur(despues) + ' de ' + eur(limite);
+  if (cruce === 'aviso') return 'Vas al 80% de tu presupuesto ' + etiqueta + ': ' + eur(despues) + ' de ' + eur(limite);
+  return '';
+}
+
+// Devuelve 'good' / 'warn' / 'bad' según qué fracción del límite llevas
+// gastada — usado tanto para el color de las barras como, si hiciera
+// falta, como clase CSS (ver --warn en styles.css).
+function colorPresupuesto(fraccion) {
+  if (fraccion >= 1) return 'bad';
+  if (fraccion >= PRESUPUESTO_UMBRAL_AVISO) return 'warn';
+  return 'good';
+}
+
 // --- Cliente de Supabase (una sola vez, compartido por toda la página) ---
 var supabaseClient = window.supabase.createClient(
   window.SUPABASE_CONFIG.url,
