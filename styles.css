@@ -17,6 +17,7 @@
     --cat-alimentacion: #6b8e4e;
     --cat-transporte: #3d6b8a;
     --cat-vivienda: #8a6a3d;
+    --cat-servicios: #8a7d3d;
     --cat-ocio: #8a3d6e;
     --cat-salud: #3d8a78;
     --cat-compras: #a15a37;
@@ -48,6 +49,7 @@
       --cat-alimentacion: #93c26c;
       --cat-transporte: #7fb2d4;
       --cat-vivienda: #c79a5f;
+      --cat-servicios: #c7b15f;
       --cat-ocio: #c56ba3;
       --cat-salud: #5fc2a9;
       --cat-compras: #d08a63;
@@ -122,20 +124,17 @@
   .nav-link {
     flex: 1;
     text-align: center;
-    padding: 9px 4px;
+    padding: 9px 2px;
     border-radius: 10px;
     text-decoration: none;
     color: var(--ink-muted);
-    font-size: 0.76rem;
+    font-size: 0.68rem;
     font-weight: 600;
     font-family: inherit;
   }
   .nav-link.active { background: var(--ink); color: var(--surface); }
 
-  .ingresos-fijos-card { padding: 16px 20px; }
-  .ingresos-fijos-card .two-col { grid-template-columns: 1.3fr 1fr; margin-bottom: 0; }
-  .ingresos-fijos-card .field { margin-bottom: 0; }
-  .ingresos-fijos-card .hint {
+  .hint {
     font-size: 0.74rem;
     color: var(--ink-muted);
     margin: 10px 0 0;
@@ -512,9 +511,38 @@
     font-size: 0.88rem;
     margin-top: 4px;
   }
+  .fijo-amount.good { color: var(--good); }
+  .fijo-amount.bad { color: var(--bad); }
   .fijo-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
   .fijo-actions .link-btn { padding: 2px 4px; }
   .fijo-actions .link-btn.danger { color: var(--bad); }
+
+  /* --- Pendientes de confirmar importe (gastos/ingresos fijos "variables") --- */
+  .pendientes-card { border-color: var(--accent); }
+  .pendiente-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .pendiente-row:last-child { border-bottom: none; }
+  .pendiente-info { min-width: 0; }
+  .pendiente-title { font-size: 0.87rem; font-weight: 600; margin: 0; }
+  .pendiente-meta { font-size: 0.75rem; color: var(--ink-muted); margin: 2px 0 0; }
+  .pendiente-form { display: flex; gap: 6px; align-items: center; flex: none; }
+  .pendiente-form input {
+    width: 84px;
+    padding: 8px 9px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 0.85rem;
+  }
+  .pendiente-form .mini-btn { margin-top: 0; }
 
   .checkbox-row {
     display: flex;
