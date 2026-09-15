@@ -57,7 +57,7 @@
 
   <section class="card" id="ingresosFijosListCard">
     <button type="button" class="collapsible-header" id="ingresosToggle" aria-expanded="false" aria-controls="ingresosBody">
-      <p class="eyebrow" style="margin:0;">Tus ingresos fijos</p>
+      <p class="eyebrow" style="margin:0;" id="ingresosToggleLabel">Ver mis ingresos fijos</p>
       <span class="collapsible-chevron" aria-hidden="true">▾</span>
     </button>
     <div class="collapsible-body" id="ingresosBody" hidden>
@@ -136,6 +136,7 @@ var PAGINA_ACTUAL = 'ingresos-fijos';
   var ingresosEmpty = document.getElementById('ingresosEmpty');
   var ingresosErrorNote = document.getElementById('ingresosErrorNote');
   var ingresosToggle = document.getElementById('ingresosToggle');
+  var ingresosToggleLabel = document.getElementById('ingresosToggleLabel');
   var ingresosBody = document.getElementById('ingresosBody');
   var ingresoConceptoInput = document.getElementById('ingresoConceptoInput');
   var ingresoImporteInput = document.getElementById('ingresoImporteInput');
@@ -160,8 +161,10 @@ var PAGINA_ACTUAL = 'ingresos-fijos';
 
   ingresosToggle.addEventListener('click', function () {
     var expandido = ingresosToggle.getAttribute('aria-expanded') === 'true';
-    ingresosToggle.setAttribute('aria-expanded', String(!expandido));
+    var nuevoExpandido = !expandido;
+    ingresosToggle.setAttribute('aria-expanded', String(nuevoExpandido));
     ingresosBody.hidden = expandido;
+    ingresosToggleLabel.textContent = nuevoExpandido ? 'Ocultar mis ingresos fijos' : 'Ver mis ingresos fijos';
   });
 
   ingresoVariableInput.addEventListener('change', function () {
