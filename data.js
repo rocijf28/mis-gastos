@@ -34,72 +34,105 @@ function setDineroInicial(importe) {
   });
 }
 
-// --- Ingresos fijos por mes (desplegable de "Registrar") ---
-// Genera el desplegable de meses igual que antes: desde 12 meses atrás
-// (o el mes más antiguo con algo guardado, si es anterior) hasta 24
-// meses por delante — sin límite real, porque estos meses futuros son
-// solo un cálculo del navegador, no hace falta guardarlos en la base
-// de datos hasta que de verdad se rellenen.
-function getMesesDropdown() {
-  return Promise.all([
-    supabaseClient.from('ingresos_fijos_mensuales').select('mes, importe').order('mes', { ascending: true }),
-    getPerfil()
-  ]).then(function (res) {
-    var filas = lanzarSiError_(res[0]) || [];
-    var mapa = {};
-    filas.forEach(function (f) { mapa[claveMes(f.mes)] = Number(f.importe); });
-
-    var hoy = new Date();
-    var inicioMesActual = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    var indiceMesActual = inicioMesActual.getFullYear() * 12 + inicioMesActual.getMonth();
-
-    var indiceMinimo = indiceMesActual - 12;
-    if (filas.length > 0) {
-      var primeraFecha = new Date(filas[0].mes);
-      var indicePrimera = primeraFecha.getFullYear() * 12 + primeraFecha.getMonth();
-      if (indicePrimera < indiceMinimo) indiceMinimo = indicePrimera;
-    }
-    var indiceMaximo = indiceMesActual + 24;
-
-    var salida = [];
-    for (var idx = indiceMinimo; idx <= indiceMaximo; idx++) {
-      var anio = Math.floor(idx / 12);
-      var mes = idx % 12;
-      var fecha = new Date(anio, mes, 1);
-      var mm = String(mes + 1).padStart(2, '0');
-      var fechaISO = anio + '-' + mm + '-01';
-      var clave = anio + '-' + mes;
-      salida.push({
-        clave: clave,
-        etiqueta: etiquetaMes(fechaISO),
-        ingresoFijo: (clave in mapa) ? mapa[clave] : null,
-        esMesActual: idx === indiceMesActual
-      });
-    }
-    return salida;
+// --- Ingresos fijos (misma estructura que Gastos fijos: una lista de
+// conceptos recurrentes, en vez de un único importe por mes) ---
+function getIngresosFijos() {
+  return supabaseClient.from('ingresos_fijos').select('*').order('concepto').then(function (res) {
+    var filas = lanzarSiError_(res) || [];
+    return filas.map(function (f) {
+      return {
+        id: f.id, concepto: f.concepto, importe: Number(f.importe),
+        frecuencia: f.frecuencia, metodoPago: f.metodo_pago || '', proximaFecha: f.proxima_fecha,
+        activo: !!f.activo, variable: !!f.variable, nota: f.nota || ''
+      };
+    });
   });
 }
 
-function guardarIngresoFijoMes(claveMesTexto, importe) {
-  var partes = claveMesTexto.split('-');
-  var anio = Number(partes[0]), mes = Number(partes[1]);
-  var mm = String(mes + 1).padStart(2, '0');
-  var mesISO = anio + '-' + mm + '-01';
-
+function guardarIngresoFijo(datos) {
+  var valores = {
+    concepto: datos.concepto, importe: datos.importe, frecuencia: datos.frecuencia,
+    metodo_pago: datos.metodoPago, proxima_fecha: datos.proximaFecha,
+    activo: !!datos.activo, variable: !!datos.variable, nota: datos.nota || ''
+  };
+  if (datos.id) {
+    return supabaseClient.from('ingresos_fijos').update(valores).eq('id', datos.id).then(lanzarSiError_);
+  }
   return currentUserId_().then(function (uid) {
-    return supabaseClient.from('ingresos_fijos_mensuales')
-      .upsert({ user_id: uid, mes: mesISO, importe: importe }, { onConflict: 'user_id,mes' })
+    valores.user_id = uid;
+    return supabaseClient.from('ingresos_fijos').insert(valores).then(lanzarSiError_);
+  });
+}
+
+function eliminarIngresoFijo(id) {
+  return supabaseClient.from('ingresos_fijos').delete().eq('id', id).then(lanzarSiError_);
+}
+
+// --- Pendientes de confirmar importe (gastos e ingresos fijos
+// "variables" cuya próxima fecha ya ha llegado): el servidor NO los
+// añade solos — hay que confirmar el importe real desde la app. ---
+function getPendientesGastosFijos() {
+  var hoy = hoyISO();
+  return supabaseClient.from('gastos_fijos').select('*')
+    .eq('activo', true).eq('variable', true).lte('proxima_fecha', hoy)
+    .order('proxima_fecha').then(function (res) {
+      var filas = lanzarSiError_(res) || [];
+      return filas.map(function (f) {
+        return {
+          id: f.id, concepto: f.concepto, categoria: f.categoria,
+          proximaFecha: f.proxima_fecha, frecuencia: f.frecuencia,
+          retraso: periodosDeRetraso(f.proxima_fecha, f.frecuencia)
+        };
+      });
+    });
+}
+
+function confirmarGastoFijoVariable(gastoFijoId, importe) {
+  return currentUserId_().then(function (uid) {
+    return supabaseClient.from('gastos_fijos').select('*').eq('id', gastoFijoId).single()
       .then(lanzarSiError_)
-      .then(function () {
-        var hoy = new Date();
-        var claveMesActual = hoy.getFullYear() + '-' + hoy.getMonth();
-        if (claveMesTexto === claveMesActual) {
-          // igual que en Apps Script: el mes actual también actualiza
-          // la nómina base, que sirve de sugerencia para el mes siguiente
-          return supabaseClient.from('perfil')
-            .upsert({ user_id: uid, nomina_base: importe }, { onConflict: 'user_id' })
-            .then(lanzarSiError_);
-        }
+      .then(function (gf) {
+        var notaFinal = 'Fijo: ' + gf.concepto + (gf.nota ? ' — ' + gf.nota : '');
+        return supabaseClient.from('gastos').insert({
+          user_id: uid, fecha: gf.proxima_fecha, categoria: gf.categoria, importe: importe,
+          metodo_pago: gf.metodo_pago, nota: notaFinal, gasto_fijo_id: gf.id, tipo_gasto: gf.tipo_gasto
+        }).then(lanzarSiError_).then(function () {
+          var siguiente = avanzarFecha(gf.proxima_fecha, gf.frecuencia);
+          return supabaseClient.from('gastos_fijos').update({ proxima_fecha: siguiente }).eq('id', gf.id).then(lanzarSiError_);
+        });
+      });
+  });
+}
+
+function getPendientesIngresosFijos() {
+  var hoy = hoyISO();
+  return supabaseClient.from('ingresos_fijos').select('*')
+    .eq('activo', true).eq('variable', true).lte('proxima_fecha', hoy)
+    .order('proxima_fecha').then(function (res) {
+      var filas = lanzarSiError_(res) || [];
+      return filas.map(function (f) {
+        return {
+          id: f.id, concepto: f.concepto,
+          proximaFecha: f.proxima_fecha, frecuencia: f.frecuencia,
+          retraso: periodosDeRetraso(f.proxima_fecha, f.frecuencia)
+        };
+      });
+    });
+}
+
+function confirmarIngresoFijoVariable(ingresoFijoId, importe) {
+  return currentUserId_().then(function (uid) {
+    return supabaseClient.from('ingresos_fijos').select('*').eq('id', ingresoFijoId).single()
+      .then(lanzarSiError_)
+      .then(function (inf) {
+        var conceptoFinal = 'Fijo: ' + inf.concepto + (inf.nota ? ' — ' + inf.nota : '');
+        return supabaseClient.from('ingresos').insert({
+          user_id: uid, fecha: inf.proxima_fecha, concepto: conceptoFinal, importe: importe,
+          metodo_pago: inf.metodo_pago, ingreso_fijo_id: inf.id
+        }).then(lanzarSiError_).then(function () {
+          var siguiente = avanzarFecha(inf.proxima_fecha, inf.frecuencia);
+          return supabaseClient.from('ingresos_fijos').update({ proxima_fecha: siguiente }).eq('id', inf.id).then(lanzarSiError_);
+        });
       });
   });
 }
@@ -108,14 +141,15 @@ function guardarIngresoFijoMes(claveMesTexto, importe) {
 function getMovimientos(limite) {
   limite = limite || 20;
   return Promise.all([
-    supabaseClient.from('gastos').select('id, fecha, categoria, importe, metodo_pago, nota')
+    supabaseClient.from('gastos').select('id, fecha, categoria, importe, metodo_pago, nota, tipo_gasto')
       .order('fecha', { ascending: false }).order('id', { ascending: false }).limit(limite),
     supabaseClient.from('ingresos').select('id, fecha, concepto, importe')
       .order('fecha', { ascending: false }).order('id', { ascending: false }).limit(limite)
   ]).then(function (res) {
     var gastos = (lanzarSiError_(res[0]) || []).map(function (g) {
       return { tipo: 'gasto', id: g.id, fecha: g.fecha, titulo: g.categoria || 'Otros',
-        metodoPago: g.metodo_pago || '', nota: g.nota || '', importe: Number(g.importe) };
+        metodoPago: g.metodo_pago || '', nota: g.nota || '', importe: Number(g.importe),
+        tipoGasto: g.tipo_gasto || null };
     });
     var ingresos = (lanzarSiError_(res[1]) || []).map(function (i) {
       return { tipo: 'ingreso', id: i.id, fecha: i.fecha, titulo: i.concepto || 'Ingreso',
@@ -142,6 +176,7 @@ function editarMovimiento(mov) {
     cambios.categoria = mov.categoria;
     cambios.metodo_pago = mov.metodoPago;
     cambios.nota = mov.nota || '';
+    cambios.tipo_gasto = mov.tipoGasto || null;
   } else {
     cambios.concepto = mov.concepto;
   }
@@ -153,7 +188,8 @@ function addGasto(datos) {
   return currentUserId_().then(function (uid) {
     return supabaseClient.from('gastos').insert({
       user_id: uid, fecha: datos.fecha, categoria: datos.categoria,
-      importe: datos.importe, metodo_pago: datos.metodoPago, nota: datos.nota || ''
+      importe: datos.importe, metodo_pago: datos.metodoPago, nota: datos.nota || '',
+      tipo_gasto: datos.tipoGasto || null
     }).then(lanzarSiError_);
   });
 }
@@ -175,7 +211,7 @@ function getGastosFijos() {
       return {
         id: f.id, concepto: f.concepto, categoria: f.categoria, importe: Number(f.importe),
         frecuencia: f.frecuencia, metodoPago: f.metodo_pago || '', proximaFecha: f.proxima_fecha,
-        activo: !!f.activo, nota: f.nota || ''
+        activo: !!f.activo, variable: !!f.variable, tipoGasto: f.tipo_gasto || null, nota: f.nota || ''
       };
     });
   });
@@ -185,7 +221,8 @@ function guardarGastoFijo(datos) {
   var valores = {
     concepto: datos.concepto, categoria: datos.categoria, importe: datos.importe,
     frecuencia: datos.frecuencia, metodo_pago: datos.metodoPago,
-    proxima_fecha: datos.proximaFecha, activo: !!datos.activo, nota: datos.nota || ''
+    proxima_fecha: datos.proximaFecha, activo: !!datos.activo, variable: !!datos.variable,
+    tipo_gasto: datos.tipoGasto || null, nota: datos.nota || ''
   };
   if (datos.id) {
     return supabaseClient.from('gastos_fijos').update(valores).eq('id', datos.id).then(lanzarSiError_);
@@ -210,20 +247,19 @@ function getResumenActual() {
 
   return Promise.all([
     getPerfil(),
-    supabaseClient.from('gastos').select('fecha, categoria, importe')
+    supabaseClient.from('gastos').select('fecha, categoria, importe, tipo_gasto')
       .gte('fecha', inicioMes).lt('fecha', inicioMesSiguiente),
-    supabaseClient.from('ingresos').select('importe')
-      .gte('fecha', inicioMes).lt('fecha', inicioMesSiguiente),
-    supabaseClient.from('ingresos_fijos_mensuales').select('importe').eq('mes', inicioMes).maybeSingle()
+    supabaseClient.from('ingresos').select('importe, ingreso_fijo_id')
+      .gte('fecha', inicioMes).lt('fecha', inicioMesSiguiente)
   ]).then(function (res) {
     var perfil = res[0];
     var gastosMes = lanzarSiError_(res[1]) || [];
-    var ingresosPuntuales = lanzarSiError_(res[2]) || [];
-    var ingresoFijoRow = lanzarSiError_(res[3]);
+    var ingresosMesFilas = lanzarSiError_(res[2]) || [];
 
     var porCategoria = {};
     CATEGORIES.forEach(function (c) { porCategoria[c.id] = 0; });
     var totalMesActual = 0, mayorGasto = 0, totalHastaHoy = 0;
+    var necesarioMes = 0, prescindibleMes = 0;
 
     gastosMes.forEach(function (g) {
       var importe = Number(g.importe) || 0;
@@ -231,10 +267,18 @@ function getResumenActual() {
       porCategoria[g.categoria] = (porCategoria[g.categoria] || 0) + importe;
       if (importe > mayorGasto) mayorGasto = importe;
       if (g.fecha <= hoyStr) totalHastaHoy += importe;
+      if (tipoEfectivo(g.categoria, g.tipo_gasto) === 'necesario') necesarioMes += importe;
+      else prescindibleMes += importe;
     });
 
-    var ingresosPuntualesMes = ingresosPuntuales.reduce(function (s, i) { return s + (Number(i.importe) || 0); }, 0);
-    var ingresosFijosMes = ingresoFijoRow ? Number(ingresoFijoRow.importe) : 0;
+    // Un ingreso con "ingreso_fijo_id" viene de un ingreso fijo (nómina...);
+    // sin él, es un ingreso puntual — misma distinción que usa resumen_mensual.
+    var ingresosFijosMes = 0, ingresosPuntualesMes = 0;
+    ingresosMesFilas.forEach(function (i) {
+      var importe = Number(i.importe) || 0;
+      if (i.ingreso_fijo_id) ingresosFijosMes += importe;
+      else ingresosPuntualesMes += importe;
+    });
     var ingresosMesActual = ingresosFijosMes + ingresosPuntualesMes;
     var ahorroMes = ingresosMesActual - totalMesActual;
     var pctAhorroMes = ingresosMesActual !== 0 ? (ahorroMes / ingresosMesActual) : 0;
@@ -251,7 +295,9 @@ function getResumenActual() {
       pctAhorroMes: pctAhorroMes,
       gastoMedioDiario: gastoMedioDiario,
       mayorGasto: mayorGasto,
-      porCategoria: porCategoria
+      porCategoria: porCategoria,
+      necesarioMes: necesarioMes,
+      prescindibleMes: prescindibleMes
       // "saldoTotal" se añade en getEvolucionYSaldo() (necesita el histórico completo)
     };
   });
@@ -291,4 +337,69 @@ function getEvolucionYSaldo() {
 
     return { saldoTotal: saldoTotal, evolucion: evolucion };
   });
+}
+
+// --- Anomalías: compara cada gasto fijo con su propio historial (nunca
+// gastos sueltos entre sí, que no son comparables). Necesita al menos
+// una ocurrencia anterior del MISMO gasto fijo para poder avisar — por
+// eso enlazamos cada gasto generado con su "gasto_fijo_id". Umbral: una
+// desviación de más del 25% sobre la media de ocurrencias anteriores
+// (hasta las últimas 6) se marca como anomalía; si además hay una
+// ocurrencia de hace ~12 meses, se muestra esa comparación también. ---
+var ANOMALIA_UMBRAL = 0.25;
+var ANOMALIA_HISTORIAL_MAX = 6;
+
+function getAnomalias() {
+  return supabaseClient.from('gastos')
+    .select('id, fecha, importe, gasto_fijo_id, gastos_fijos(concepto)')
+    .not('gasto_fijo_id', 'is', null)
+    .order('fecha', { ascending: true })
+    .then(function (res) {
+      var filas = lanzarSiError_(res) || [];
+      var porFijo = {};
+      filas.forEach(function (g) {
+        var lista = porFijo[g.gasto_fijo_id] || (porFijo[g.gasto_fijo_id] = []);
+        lista.push({
+          fecha: g.fecha,
+          importe: Number(g.importe),
+          concepto: (g.gastos_fijos && g.gastos_fijos.concepto) || 'Gasto fijo'
+        });
+      });
+
+      var anomalias = [];
+      var hayHistorialSuficiente = false;
+      Object.keys(porFijo).forEach(function (gastoFijoId) {
+        var ocurrencias = porFijo[gastoFijoId];
+        if (ocurrencias.length < 2) return; // nada con qué comparar todavía
+        hayHistorialSuficiente = true;
+
+        var actual = ocurrencias[ocurrencias.length - 1];
+        var anteriores = ocurrencias.slice(Math.max(0, ocurrencias.length - 1 - ANOMALIA_HISTORIAL_MAX), ocurrencias.length - 1);
+        var media = anteriores.reduce(function (s, o) { return s + o.importe; }, 0) / anteriores.length;
+        if (media <= 0) return;
+
+        var desviacion = (actual.importe - media) / media;
+        if (Math.abs(desviacion) < ANOMALIA_UMBRAL) return;
+
+        // ¿Hay una ocurrencia de hace ~12 meses (mismo mes, año anterior)?
+        var fechaActual = new Date(actual.fecha);
+        var mismoMesAnoAnterior = anteriores.filter(function (o) {
+          var f = new Date(o.fecha);
+          return f.getMonth() === fechaActual.getMonth() && f.getFullYear() === fechaActual.getFullYear() - 1;
+        })[0];
+
+        anomalias.push({
+          concepto: actual.concepto,
+          fecha: actual.fecha,
+          importe: actual.importe,
+          mediaAnterior: media,
+          desviacionPct: desviacion,
+          importeAnoAnterior: mismoMesAnoAnterior ? mismoMesAnoAnterior.importe : null,
+          numOcurrenciasPrevias: anteriores.length
+        });
+      });
+
+      anomalias.sort(function (a, b) { return Math.abs(b.desviacionPct) - Math.abs(a.desviacionPct); });
+      return { anomalias: anomalias, hayHistorialSuficiente: hayHistorialSuficiente };
+    });
 }
