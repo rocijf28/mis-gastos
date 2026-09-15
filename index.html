@@ -31,6 +31,7 @@
     <a class="nav-link" data-page="fijos" href="gastos-fijos.html">Gastos fijos</a>
     <a class="nav-link" data-page="ingresos-fijos" href="ingresos-fijos.html">Ingresos fijos</a>
     <a class="nav-link" data-page="resumen" href="resumen.html">Resumen</a>
+    <a class="nav-link" data-page="anomalias" href="anomalias.html">Anomalías</a>
   </nav>
 
   <div class="modal-overlay" id="dineroInicialModal" hidden>
@@ -73,6 +74,11 @@
       </div>
     </div>
 
+    <div class="field" id="tipoGastoField">
+      <label for="tipoGastoInput">Necesario / prescindible</label>
+      <select id="tipoGastoInput"></select>
+    </div>
+
     <div class="field">
       <label for="noteInput" id="noteLabel">Nota (opcional)</label>
       <input type="text" id="noteInput" placeholder="Ej. cena con Marta" maxlength="120" />
@@ -105,12 +111,15 @@ var PAGINA_ACTUAL = 'registrar';
   var dateMethodRow = document.getElementById('dateMethodRow');
   var methodField = document.getElementById('methodField');
   var methodInput = document.getElementById('methodInput');
+  var tipoGastoField = document.getElementById('tipoGastoField');
+  var tipoGastoInput = document.getElementById('tipoGastoInput');
   var noteLabel = document.getElementById('noteLabel');
   var noteInput = document.getElementById('noteInput');
   var formError = document.getElementById('formError');
   var submitBtn = document.getElementById('submitBtn');
 
   poblarSelectMetodos(methodInput);
+  poblarSelectTipoGasto(tipoGastoInput);
 
   function setTipo(nuevoTipo) {
     tipo = nuevoTipo;
@@ -121,6 +130,7 @@ var PAGINA_ACTUAL = 'registrar';
 
     catGrid.hidden = esIngreso;
     methodField.hidden = esIngreso;
+    tipoGastoField.hidden = esIngreso;
     dateMethodRow.classList.toggle('single-col', esIngreso);
 
     noteLabel.textContent = esIngreso ? 'Concepto' : 'Nota (opcional)';
@@ -177,7 +187,7 @@ var PAGINA_ACTUAL = 'registrar';
 
     var promesa = esIngreso
       ? addIngreso({ fecha: dateInput.value, importe: importe, concepto: concepto })
-      : addGasto({ fecha: dateInput.value, categoria: selectedCategory, importe: importe, metodoPago: methodInput.value, nota: concepto });
+      : addGasto({ fecha: dateInput.value, categoria: selectedCategory, importe: importe, metodoPago: methodInput.value, nota: concepto, tipoGasto: tipoGastoInput.value || null });
 
     promesa
       .then(function () {
