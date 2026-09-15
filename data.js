@@ -22,7 +22,7 @@ function lanzarSiError_(res) {
 function getPerfil() {
   return supabaseClient.from('perfil').select('*').maybeSingle().then(function (res) {
     var data = lanzarSiError_(res);
-    return data || { dinero_inicial: null, nomina_base: 0 };
+    return data || { dinero_inicial: null, nomina_base: 0, presupuesto_mensual: null };
   });
 }
 
@@ -31,6 +31,76 @@ function setDineroInicial(importe) {
     return supabaseClient.from('perfil')
       .upsert({ user_id: uid, dinero_inicial: importe }, { onConflict: 'user_id' })
       .then(lanzarSiError_);
+  });
+}
+
+// --- Presupuesto mensual ---
+// Límite total (nullable): vive en "perfil", igual que el dinero inicial —
+// un único valor que se aplica siempre hasta que lo cambies (no hay
+// histórico mes a mes).
+function guardarPresupuestoMensual(importe) {
+  return currentUserId_().then(function (uid) {
+    return supabaseClient.from('perfil')
+      .upsert({ user_id: uid, presupuesto_mensual: importe }, { onConflict: 'user_id' })
+      .then(lanzarSiError_);
+  });
+}
+
+// Límites opcionales por categoría: como mucho uno por categoría.
+// Se devuelven como un objeto { categoria: importe } para poder
+// consultarlos directamente por nombre de categoría.
+function getPresupuestosCategoria() {
+  return supabaseClient.from('presupuestos_categoria').select('categoria, importe').then(function (res) {
+    var filas = lanzarSiError_(res) || [];
+    var porCategoria = {};
+    filas.forEach(function (f) { porCategoria[f.categoria] = Number(f.importe); });
+    return porCategoria;
+  });
+}
+
+function guardarPresupuestoCategoria(categoria, importe) {
+  return currentUserId_().then(function (uid) {
+    return supabaseClient.from('presupuestos_categoria')
+      .upsert({ user_id: uid, categoria: categoria, importe: importe }, { onConflict: 'user_id,categoria' })
+      .then(lanzarSiError_);
+  });
+}
+
+function eliminarPresupuestoCategoria(categoria) {
+  return supabaseClient.from('presupuestos_categoria').delete().eq('categoria', categoria).then(lanzarSiError_);
+}
+
+// Comprueba, tras añadir un gasto nuevo o editar uno existente, si ese
+// cambio ha hecho cruzar hacia arriba el 80% o el 100% de algún
+// presupuesto configurado. "cambios" es una lista de { categoria, delta }:
+// usa categoria=null para comprobar el presupuesto TOTAL, y el nombre de
+// una categoría para comprobar su límite (si tiene uno). "delta" es
+// cuánto ha subido (o bajado, si es negativo) el gasto de ese mes en esa
+// categoría/total por esta acción concreta — quien llama a esta función
+// es responsable de calcularlo bien (ver index.html y movimientos.html,
+// que tienen en cuenta cambios de mes y de categoría al editar).
+// Devuelve una promesa con la lista de mensajes de aviso (puede ser vacía).
+function comprobarAvisosPresupuesto(cambios) {
+  cambios = (cambios || []).filter(function (c) { return c.delta; });
+  if (!cambios.length) return Promise.resolve([]);
+
+  return getResumenActual().then(function (resumen) {
+    var avisos = [];
+    cambios.forEach(function (c) {
+      var limite, despues;
+      if (c.categoria) {
+        limite = resumen.presupuestosCategoria && resumen.presupuestosCategoria[c.categoria];
+        despues = resumen.porCategoria[c.categoria] || 0;
+      } else {
+        limite = resumen.presupuestoMensual;
+        despues = resumen.totalMes;
+      }
+      if (!limite) return;
+      var antes = despues - c.delta;
+      var cruce = cruzarUmbralPresupuesto(antes, despues, limite);
+      if (cruce) avisos.push(mensajeAvisoPresupuesto(cruce, c.categoria, despues, limite));
+    });
+    return avisos;
   });
 }
 
@@ -250,11 +320,13 @@ function getResumenActual() {
     supabaseClient.from('gastos').select('fecha, categoria, importe, tipo_gasto')
       .gte('fecha', inicioMes).lt('fecha', inicioMesSiguiente),
     supabaseClient.from('ingresos').select('importe, ingreso_fijo_id')
-      .gte('fecha', inicioMes).lt('fecha', inicioMesSiguiente)
+      .gte('fecha', inicioMes).lt('fecha', inicioMesSiguiente),
+    getPresupuestosCategoria()
   ]).then(function (res) {
     var perfil = res[0];
     var gastosMes = lanzarSiError_(res[1]) || [];
     var ingresosMesFilas = lanzarSiError_(res[2]) || [];
+    var presupuestosCategoria = res[3] || {};
 
     var porCategoria = {};
     CATEGORIES.forEach(function (c) { porCategoria[c.id] = 0; });
@@ -297,7 +369,10 @@ function getResumenActual() {
       mayorGasto: mayorGasto,
       porCategoria: porCategoria,
       necesarioMes: necesarioMes,
-      prescindibleMes: prescindibleMes
+      prescindibleMes: prescindibleMes,
+      presupuestoMensual: (perfil.presupuesto_mensual === null || typeof perfil.presupuesto_mensual === 'undefined')
+        ? null : Number(perfil.presupuesto_mensual),
+      presupuestosCategoria: presupuestosCategoria
       // "saldoTotal" se añade en getEvolucionYSaldo() (necesita el histórico completo)
     };
   });
