@@ -7,19 +7,52 @@ var CATEGORIES = [
   { id: 'Alimentación', varName: '--cat-alimentacion' },
   { id: 'Transporte', varName: '--cat-transporte' },
   { id: 'Vivienda', varName: '--cat-vivienda' },
+  { id: 'Servicios', varName: '--cat-servicios' },
   { id: 'Ocio', varName: '--cat-ocio' },
   { id: 'Salud', varName: '--cat-salud' },
   { id: 'Compras', varName: '--cat-compras' },
   { id: 'Suscripciones', varName: '--cat-suscripciones' },
   { id: 'Otros', varName: '--cat-otros' }
 ];
-var METODOS_PAGO = ['Tarjeta', 'Efectivo', 'Bizum', 'Otro'];
+
+// Clasificación por defecto de cada categoría en "necesario" (vivienda,
+// alimentación, salud, transporte, servicios...) o "prescindible" (lo
+// que se puede recortar sin problema). Cada gasto puede saltarse esta
+// regla individualmente con su propio "tipo_gasto" — ver NECESARIO_POR_DEFECTO.
+var NECESARIO_POR_DEFECTO = {
+  'Alimentación': true,
+  'Transporte': true,
+  'Vivienda': true,
+  'Servicios': true,
+  'Salud': true,
+  'Otros': true,
+  'Ocio': false,
+  'Compras': false,
+  'Suscripciones': false
+};
+
+// Métodos de pago para gastos/ingresos sueltos y para el desplegable de
+// "Movimientos". "Domiciliación" no aparece aquí a propósito: solo tiene
+// sentido para algo recurrente (ver METODOS_PAGO_FIJOS).
+var METODOS_PAGO = ['Tarjeta', 'Efectivo', 'Bizum', 'Transferencia', 'Otro'];
+// Métodos de pago para Gastos fijos e Ingresos fijos (recurrentes):
+// añade "Domiciliación" al final de la lista general.
+var METODOS_PAGO_FIJOS = METODOS_PAGO.concat(['Domiciliación']);
+
 var FRECUENCIAS = ['Mensual', 'Trimestral', 'Semestral', 'Anual'];
 var MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
 var catById = {};
 CATEGORIES.forEach(function (c) { catById[c.id] = c; });
+
+// --- Necesario / prescindible: tipo efectivo de un gasto ---
+// tipoGasto es el valor guardado en la fila ('necesario'/'prescindible'/
+// null); si es null, se usa la clasificación por defecto de su categoría.
+function tipoEfectivo(categoria, tipoGasto) {
+  if (tipoGasto === 'necesario' || tipoGasto === 'prescindible') return tipoGasto;
+  return NECESARIO_POR_DEFECTO[categoria] ? 'necesario' : 'prescindible';
+}
 
 // --- Cliente de Supabase (una sola vez, compartido por toda la página) ---
 var supabaseClient = window.supabase.createClient(
@@ -65,6 +98,35 @@ function hoyISO() {
   return d.getFullYear() + '-' + mm + '-' + dd;
 }
 
+// --- Avance de fecha según frecuencia (mismo criterio que
+// procesar_gastos_fijos()/procesar_ingresos_fijos() en el servidor):
+// usado en el navegador para confirmar el importe real de un gasto o
+// ingreso fijo "variable" y calcular su siguiente fecha. ---
+var MESES_POR_FRECUENCIA = { 'Mensual': 1, 'Trimestral': 3, 'Semestral': 6, 'Anual': 12 };
+
+function avanzarFecha(fechaISO, frecuencia) {
+  var partes = fechaISO.split('-').map(Number);
+  var pasos = MESES_POR_FRECUENCIA[frecuencia] || 1;
+  var d = new Date(partes[0], (partes[1] - 1) + pasos, partes[2]);
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' + mm + '-' + dd;
+}
+
+// Cuenta cuántos periodos de retraso lleva un fijo "variable" (sin
+// contar el que ya está pendiente de confirmar), solo para el aviso
+// de "y N más pendientes después de este" — no inserta ni cambia nada.
+function periodosDeRetraso(proximaFecha, frecuencia) {
+  var cursor = avanzarFecha(proximaFecha, frecuencia);
+  var hoy = hoyISO();
+  var extra = 0;
+  while (cursor <= hoy && extra < 24) {
+    extra++;
+    cursor = avanzarFecha(cursor, frecuencia);
+  }
+  return extra;
+}
+
 // --- Aviso flotante ---
 function showToast(msg) {
   var toast = document.getElementById('toast');
@@ -96,6 +158,26 @@ function poblarSelectMetodos(select) {
     var opt = document.createElement('option');
     opt.value = m;
     opt.textContent = m;
+    select.appendChild(opt);
+  });
+}
+function poblarSelectMetodosFijos(select) {
+  METODOS_PAGO_FIJOS.forEach(function (m) {
+    var opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = m;
+    select.appendChild(opt);
+  });
+}
+function poblarSelectTipoGasto(select) {
+  [
+    { value: '', label: 'Automático según categoría' },
+    { value: 'necesario', label: 'Necesario' },
+    { value: 'prescindible', label: 'Prescindible' }
+  ].forEach(function (o) {
+    var opt = document.createElement('option');
+    opt.value = o.value;
+    opt.textContent = o.label;
     select.appendChild(opt);
   });
 }
