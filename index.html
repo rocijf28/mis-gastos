@@ -29,6 +29,7 @@
     <a class="nav-link" data-page="registrar" href="index.html">Registrar</a>
     <a class="nav-link" data-page="movimientos" href="movimientos.html">Movimientos</a>
     <a class="nav-link" data-page="fijos" href="gastos-fijos.html">Gastos fijos</a>
+    <a class="nav-link" data-page="ingresos-fijos" href="ingresos-fijos.html">Ingresos fijos</a>
     <a class="nav-link" data-page="resumen" href="resumen.html">Resumen</a>
   </nav>
 
@@ -48,26 +49,10 @@
     </div>
   </div>
 
-  <section class="card ingresos-fijos-card" id="ingresosFijosCard">
-    <p class="eyebrow" style="margin-bottom:10px;">Ingresos fijos</p>
-    <div class="two-col">
-      <div class="field">
-        <label for="mesSelect">Mes</label>
-        <select id="mesSelect"></select>
-      </div>
-      <div class="field">
-        <label for="ingresoFijoInput">Importe</label>
-        <input type="number" inputmode="decimal" step="0.01" min="0" id="ingresoFijoInput" placeholder="0,00" aria-label="Ingresos fijos del mes en euros" />
-      </div>
-    </div>
-    <button type="button" class="mini-btn" id="ingresoFijoSaveBtn">Guardar</button>
-    <p class="hint">Si cambias el mes actual, se usa también como referencia para los próximos meses.</p>
-  </section>
-
   <section class="card" id="formCard">
     <div class="type-toggle" role="group" aria-label="Tipo de movimiento">
       <button type="button" class="type-btn gasto" id="tipoGastoBtn" aria-pressed="true">Gasto</button>
-      <button type="button" class="type-btn ingreso" id="tipoIngresoBtn" aria-pressed="false">Ingreso puntual</button>
+      <button type="button" class="type-btn ingreso" id="tipoIngresoBtn" aria-pressed="false">Ingreso</button>
     </div>
 
     <div class="cat-grid" id="catGrid" role="group" aria-label="Categoría del gasto"></div>
@@ -124,11 +109,6 @@ var PAGINA_ACTUAL = 'registrar';
   var noteInput = document.getElementById('noteInput');
   var formError = document.getElementById('formError');
   var submitBtn = document.getElementById('submitBtn');
-
-  var mesSelect = document.getElementById('mesSelect');
-  var ingresoFijoInput = document.getElementById('ingresoFijoInput');
-  var ingresoFijoSaveBtn = document.getElementById('ingresoFijoSaveBtn');
-  var mesesData = [];
 
   poblarSelectMetodos(methodInput);
 
@@ -214,72 +194,15 @@ var PAGINA_ACTUAL = 'registrar';
       });
   });
 
-  function actualizarInputIngresoFijo() {
-    var clave = mesSelect.value;
-    var entry = mesesData.filter(function (m) { return m.clave === clave; })[0];
-    if (!entry) { ingresoFijoInput.value = ''; return; }
-    var valor = entry.ingresoFijo !== null ? entry.ingresoFijo : window.NOMINA_SUGERIDA;
-    ingresoFijoInput.value = valor ? Number(valor).toFixed(2) : '';
-  }
-
-  function renderMeses(meses) {
-    mesesData = meses || [];
-    var seleccionPrevia = mesSelect.value;
-    mesSelect.innerHTML = '';
-    mesesData.forEach(function (m) {
-      var opt = document.createElement('option');
-      opt.value = m.clave;
-      opt.textContent = m.etiqueta;
-      mesSelect.appendChild(opt);
-    });
-    var actual = mesesData.filter(function (m) { return m.esMesActual; })[0];
-    var siguePresente = mesesData.some(function (m) { return m.clave === seleccionPrevia; });
-    mesSelect.value = siguePresente ? seleccionPrevia : (actual ? actual.clave : (mesesData[0] && mesesData[0].clave) || '');
-    actualizarInputIngresoFijo();
-  }
-
-  mesSelect.addEventListener('change', actualizarInputIngresoFijo);
-
-  ingresoFijoSaveBtn.addEventListener('click', function () {
-    var clave = mesSelect.value;
-    var importe = parseFloat(ingresoFijoInput.value);
-    if (!clave) {
-      showToast('Elige un mes.');
-      return;
-    }
-    if (isNaN(importe) || importe < 0) {
-      showToast('Escribe un importe válido.');
-      return;
-    }
-    ingresoFijoSaveBtn.disabled = true;
-    ingresoFijoSaveBtn.textContent = 'Guardando…';
-
-    guardarIngresoFijoMes(clave, importe)
-      .then(function () {
-        showToast('Ingresos fijos actualizados: ' + eur(importe));
-        cargarResumen();
-      })
-      .catch(function (err) {
-        showToast(err.message || 'No se pudo guardar. Inténtalo de nuevo.');
-      })
-      .then(function () {
-        ingresoFijoSaveBtn.disabled = false;
-        ingresoFijoSaveBtn.textContent = 'Guardar';
-      });
-  });
-
   function cargarResumen() {
-    Promise.all([getPerfil(), getMesesDropdown()])
-      .then(function (res) {
-        var perfil = res[0], meses = res[1];
-        window.NOMINA_SUGERIDA = Number(perfil.nomina_base) || 0;
-        renderMeses(meses);
+    getPerfil()
+      .then(function (perfil) {
         if (perfil.dinero_inicial === null || typeof perfil.dinero_inicial === 'undefined') {
           mostrarDineroInicialModal(true);
         }
       })
       .catch(function () {
-        showToast('No se pudo cargar el resumen.');
+        showToast('No se pudo cargar el perfil.');
       });
   }
 
