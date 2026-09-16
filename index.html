@@ -87,6 +87,47 @@
     <p class="form-error" id="formError"></p>
     <button class="submit-btn" id="submitBtn" type="button">Añadir gasto</button>
   </section>
+
+  <section class="card" id="presupuestoCard">
+    <div class="summary-head" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0;">
+      <p class="eyebrow" style="margin:0;">Presupuesto mensual</p>
+      <button type="button" class="link-btn" id="presupuestoConfigBtn">Configurar</button>
+    </div>
+    <p class="hint" id="presupuestoResumenTexto" style="margin-top:10px;">Cargando…</p>
+  </section>
+
+  <div class="modal-overlay" id="presupuestoModal" hidden>
+    <div class="modal-card">
+      <h2>Configurar presupuesto</h2>
+      <p class="modal-copy">Un límite total y, si quieres, límites por categoría. Te avisamos al llegar al 80% y al superarlos, y puedes ver el progreso en "Resumen".</p>
+
+      <div class="field">
+        <label for="presupuestoTotalInput">Presupuesto total mensual</label>
+        <input type="number" inputmode="decimal" step="0.01" min="0" id="presupuestoTotalInput" placeholder="Ej. 1200 (déjalo en blanco para quitarlo)" />
+      </div>
+      <p class="form-error" id="presupuestoTotalError"></p>
+
+      <div class="fijo-form no-border">
+        <p class="fijo-form-title">Límites por categoría (opcional)</p>
+        <div id="presupuestoCategoriasList"></div>
+        <div class="two-col" style="margin-top:10px;">
+          <div class="field" style="margin-bottom:0;">
+            <select id="presupuestoCategoriaSelect" aria-label="Categoría"></select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <input type="number" inputmode="decimal" step="0.01" min="0" id="presupuestoCategoriaImporte" placeholder="Importe" aria-label="Importe del límite" />
+          </div>
+        </div>
+        <button type="button" class="mini-btn" id="presupuestoCategoriaAddBtn">Añadir límite</button>
+      </div>
+
+      <p class="form-error" id="presupuestoError"></p>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="submit-btn" id="presupuestoSaveBtn" type="button">Guardar</button>
+        <button class="link-btn" id="presupuestoCloseBtn" type="button">Cerrar</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -118,8 +159,25 @@ var PAGINA_ACTUAL = 'registrar';
   var formError = document.getElementById('formError');
   var submitBtn = document.getElementById('submitBtn');
 
+  var presupuestoConfigBtn = document.getElementById('presupuestoConfigBtn');
+  var presupuestoResumenTexto = document.getElementById('presupuestoResumenTexto');
+  var presupuestoModal = document.getElementById('presupuestoModal');
+  var presupuestoTotalInput = document.getElementById('presupuestoTotalInput');
+  var presupuestoTotalError = document.getElementById('presupuestoTotalError');
+  var presupuestoCategoriasList = document.getElementById('presupuestoCategoriasList');
+  var presupuestoCategoriaSelect = document.getElementById('presupuestoCategoriaSelect');
+  var presupuestoCategoriaImporte = document.getElementById('presupuestoCategoriaImporte');
+  var presupuestoCategoriaAddBtn = document.getElementById('presupuestoCategoriaAddBtn');
+  var presupuestoError = document.getElementById('presupuestoError');
+  var presupuestoSaveBtn = document.getElementById('presupuestoSaveBtn');
+  var presupuestoCloseBtn = document.getElementById('presupuestoCloseBtn');
+
+  var presupuestoActual = { mensual: null, porCategoria: {} };
+  var presupuestoCategoriasModalCache = {};
+
   poblarSelectMetodos(methodInput);
   poblarSelectTipoGasto(tipoGastoInput);
+  poblarSelectCategorias(presupuestoCategoriaSelect);
 
   function setTipo(nuevoTipo) {
     tipo = nuevoTipo;
@@ -219,14 +277,138 @@ var PAGINA_ACTUAL = 'registrar';
       });
   });
 
+  // --- Presupuesto mensual: aquí es donde se configura (total y límites
+  // por categoría); el progreso con barras de color es solo informativo
+  // y vive en la página Resumen. ---
+  function renderPresupuestoResumenTexto() {
+    var partes = [];
+    if (presupuestoActual.mensual) partes.push('Total: ' + eur(presupuestoActual.mensual));
+    Object.keys(presupuestoActual.porCategoria).forEach(function (cat) {
+      partes.push(cat + ': ' + eur(presupuestoActual.porCategoria[cat]));
+    });
+    presupuestoResumenTexto.textContent = partes.length
+      ? partes.join(' · ')
+      : 'Sin presupuesto configurado. El progreso se ve en "Resumen".';
+  }
+
+  function renderPresupuestoCategoriasList(porCategoria) {
+    presupuestoCategoriasList.innerHTML = '';
+    Object.keys(porCategoria || {}).forEach(function (cat) {
+      var row = document.createElement('div');
+      row.className = 'fijo-row';
+      var info = document.createElement('div');
+      info.className = 'fijo-info';
+      info.innerHTML = '<p class="fijo-title">' + cat + '</p><p class="fijo-meta">' + eur(porCategoria[cat]) + '</p>';
+      var quitarBtn = document.createElement('button');
+      quitarBtn.type = 'button';
+      quitarBtn.className = 'link-btn danger';
+      quitarBtn.textContent = 'Quitar';
+      quitarBtn.addEventListener('click', function () {
+        quitarBtn.disabled = true;
+        eliminarPresupuestoCategoria(cat)
+          .then(function () {
+            delete porCategoria[cat];
+            delete presupuestoActual.porCategoria[cat];
+            renderPresupuestoCategoriasList(porCategoria);
+            renderPresupuestoResumenTexto();
+          })
+          .catch(function (err) {
+            presupuestoError.textContent = err.message || 'No se pudo quitar.';
+            quitarBtn.disabled = false;
+          });
+      });
+      row.appendChild(info);
+      row.appendChild(quitarBtn);
+      presupuestoCategoriasList.appendChild(row);
+    });
+  }
+
+  function abrirPresupuestoModal() {
+    presupuestoError.textContent = '';
+    presupuestoTotalError.textContent = '';
+    presupuestoTotalInput.value = presupuestoActual.mensual ? presupuestoActual.mensual.toFixed(2) : '';
+    presupuestoCategoriasModalCache = {};
+    Object.keys(presupuestoActual.porCategoria).forEach(function (cat) {
+      presupuestoCategoriasModalCache[cat] = presupuestoActual.porCategoria[cat];
+    });
+    renderPresupuestoCategoriasList(presupuestoCategoriasModalCache);
+    presupuestoCategoriaImporte.value = '';
+    presupuestoModal.hidden = false;
+  }
+
+  presupuestoConfigBtn.addEventListener('click', abrirPresupuestoModal);
+  presupuestoCloseBtn.addEventListener('click', function () {
+    presupuestoModal.hidden = true;
+  });
+
+  presupuestoCategoriaAddBtn.addEventListener('click', function () {
+    var categoria = presupuestoCategoriaSelect.value;
+    var importe = parseFloat(presupuestoCategoriaImporte.value);
+    if (!importe || importe <= 0) {
+      presupuestoError.textContent = 'Escribe un importe válido para el límite de categoría.';
+      return;
+    }
+    presupuestoError.textContent = '';
+    presupuestoCategoriaAddBtn.disabled = true;
+    guardarPresupuestoCategoria(categoria, importe)
+      .then(function () {
+        presupuestoCategoriasModalCache[categoria] = importe;
+        presupuestoActual.porCategoria[categoria] = importe;
+        renderPresupuestoCategoriasList(presupuestoCategoriasModalCache);
+        renderPresupuestoResumenTexto();
+        presupuestoCategoriaImporte.value = '';
+      })
+      .catch(function (err) {
+        presupuestoError.textContent = err.message || 'No se pudo guardar el límite.';
+      })
+      .then(function () {
+        presupuestoCategoriaAddBtn.disabled = false;
+      });
+  });
+
+  presupuestoSaveBtn.addEventListener('click', function () {
+    var valor = presupuestoTotalInput.value;
+    var importe = valor === '' ? null : parseFloat(valor);
+    if (valor !== '' && (isNaN(importe) || importe < 0)) {
+      presupuestoTotalError.textContent = 'Escribe un importe válido (o déjalo en blanco para quitar el presupuesto).';
+      return;
+    }
+    presupuestoTotalError.textContent = '';
+    presupuestoSaveBtn.disabled = true;
+    presupuestoSaveBtn.textContent = 'Guardando…';
+
+    guardarPresupuestoMensual(importe)
+      .then(function () {
+        presupuestoActual.mensual = importe;
+        renderPresupuestoResumenTexto();
+        showToast('Presupuesto guardado');
+        presupuestoModal.hidden = true;
+      })
+      .catch(function (err) {
+        presupuestoTotalError.textContent = err.message || 'No se pudo guardar. Inténtalo de nuevo.';
+      })
+      .then(function () {
+        presupuestoSaveBtn.disabled = false;
+        presupuestoSaveBtn.textContent = 'Guardar';
+      });
+  });
+
   function cargarResumen() {
-    getPerfil()
-      .then(function (perfil) {
+    Promise.all([getPerfil(), getPresupuestosCategoria()])
+      .then(function (res) {
+        var perfil = res[0], porCategoria = res[1];
+
+        presupuestoActual.mensual = (perfil.presupuesto_mensual === null || typeof perfil.presupuesto_mensual === 'undefined')
+          ? null : Number(perfil.presupuesto_mensual);
+        presupuestoActual.porCategoria = porCategoria || {};
+        renderPresupuestoResumenTexto();
+
         if (perfil.dinero_inicial === null || typeof perfil.dinero_inicial === 'undefined') {
           mostrarDineroInicialModal(true);
         }
       })
       .catch(function () {
+        presupuestoResumenTexto.textContent = 'No se pudo cargar.';
         showToast('No se pudo cargar el perfil.');
       });
   }
