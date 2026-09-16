@@ -97,7 +97,7 @@ solo referencia de lo que ya existe):
 ## 3. Configurar Supabase (una sola vez, proyecto nuevo)
 
 1. Abre tu proyecto en [supabase.com](https://supabase.com/dashboard) → **SQL Editor**.
-2. Ejecuta, en este orden, `sql/001_schema.sql`, `sql/002_views_and_automations.sql`, `sql/004_modificaciones_v2.sql` y `sql/005_presupuestos.sql`. (`003` es la carga histórica puntual de Rocío — sáltatelo si es un proyecto nuevo.)
+2. Ejecuta, en este orden, `sql/001_schema.sql`, `sql/002_views_and_automations.sql`, `sql/004_modificaciones_v2.sql` y `sql/005_presupuestos.sql`.
 3. **Crea tu usuario:** en el panel de Supabase, ve a **Authentication → Users → Add user**, escribe tu correo y una contraseña, y guarda. El trigger del paso 2 te crea automáticamente tu fila de `perfil`.
 4. Por seguridad (es una app de datos financieros personales), en **Authentication → Providers → Email** desactiva "Allow new users to sign up" — así nadie puede crearse una cuenta desde `login.html`; solo entra quien tenga un usuario creado por ti.
 5. Si vas a invitar a otras personas más adelante, configura también la Site URL (ver punto 6) antes de mandar la primera invitación.
