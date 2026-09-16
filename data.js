@@ -51,7 +51,11 @@ function guardarPresupuestoMensual(importe) {
 // consultarlos directamente por nombre de categoría.
 function getPresupuestosCategoria() {
   return supabaseClient.from('presupuestos_categoria').select('categoria, importe').then(function (res) {
-    var filas = lanzarSiError_(res) || [];
+    // Si la tabla todavía no existe (falta ejecutar 005_presupuestos.sql)
+    // u ocurre cualquier otro fallo, no rompemos el resumen entero por
+    // esto: simplemente no hay límites por categoría todavía.
+    if (res.error) return {};
+    var filas = res.data || [];
     var porCategoria = {};
     filas.forEach(function (f) { porCategoria[f.categoria] = Number(f.importe); });
     return porCategoria;
@@ -449,32 +453,4 @@ function getAnomalias() {
         hayHistorialSuficiente = true;
 
         var actual = ocurrencias[ocurrencias.length - 1];
-        var anteriores = ocurrencias.slice(Math.max(0, ocurrencias.length - 1 - ANOMALIA_HISTORIAL_MAX), ocurrencias.length - 1);
-        var media = anteriores.reduce(function (s, o) { return s + o.importe; }, 0) / anteriores.length;
-        if (media <= 0) return;
-
-        var desviacion = (actual.importe - media) / media;
-        if (Math.abs(desviacion) < ANOMALIA_UMBRAL) return;
-
-        // ¿Hay una ocurrencia de hace ~12 meses (mismo mes, año anterior)?
-        var fechaActual = new Date(actual.fecha);
-        var mismoMesAnoAnterior = anteriores.filter(function (o) {
-          var f = new Date(o.fecha);
-          return f.getMonth() === fechaActual.getMonth() && f.getFullYear() === fechaActual.getFullYear() - 1;
-        })[0];
-
-        anomalias.push({
-          concepto: actual.concepto,
-          fecha: actual.fecha,
-          importe: actual.importe,
-          mediaAnterior: media,
-          desviacionPct: desviacion,
-          importeAnoAnterior: mismoMesAnoAnterior ? mismoMesAnoAnterior.importe : null,
-          numOcurrenciasPrevias: anteriores.length
-        });
-      });
-
-      anomalias.sort(function (a, b) { return Math.abs(b.desviacionPct) - Math.abs(a.desviacionPct); });
-      return { anomalias: anomalias, hayHistorialSuficiente: hayHistorialSuficiente };
-    });
-}
+        var anteriores = ocurrencias.slice(Math.max(0,
