@@ -69,6 +69,12 @@ drop policy if exists "ingresos_fijos: solo el dueño" on public.ingresos_fijos;
 create policy "ingresos_fijos: solo el dueño" on public.ingresos_fijos
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- RLS solo decide QUÉ FILAS puede tocar cada persona; sin este permiso a
+-- nivel de tabla, "authenticated" no puede ni intentar el SELECT/INSERT/
+-- UPDATE/DELETE (las tablas creadas a mano desde el Table Editor de
+-- Supabase ya lo traen solas; una tabla creada por SQL como esta, no).
+grant select, insert, update, delete on table public.ingresos_fijos to authenticated;
+
 alter table public.ingresos
   add column if not exists ingreso_fijo_id bigint references public.ingresos_fijos(id) on delete set null,
   add column if not exists metodo_pago text;
