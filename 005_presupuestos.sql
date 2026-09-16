@@ -36,3 +36,9 @@ alter table public.presupuestos_categoria enable row level security;
 drop policy if exists "presupuestos_categoria: solo el dueño" on public.presupuestos_categoria;
 create policy "presupuestos_categoria: solo el dueño" on public.presupuestos_categoria
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- RLS solo decide QUÉ FILAS puede tocar cada persona; sin este permiso a
+-- nivel de tabla, "authenticated" no puede ni intentar el SELECT/INSERT/
+-- UPDATE/DELETE (las tablas creadas a mano desde el Table Editor de
+-- Supabase ya lo traen solas; una tabla creada por SQL como esta, no).
+grant select, insert, update, delete on table public.presupuestos_categoria to authenticated;
