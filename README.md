@@ -59,9 +59,6 @@ solo referencia de lo que ya existe):
   `perfil` al crear un usuario, la vista `resumen_mensual`, y las
   funciones + tarea programada (`pg_cron`, 6:00 UTC) que procesan
   gastos fijos e ingresos fijos cada día.
-- `003_datos_historicos_rocio.sql` — carga puntual, ya ejecutada, de
-  los datos históricos de Rocío desde su hoja de Sheets original (no
-  hace falta volver a ejecutarlo).
 - `004_modificaciones_v2.sql` — añade `gastos_fijos.variable`/
   `tipo_gasto`, `gastos.gasto_fijo_id`/`tipo_gasto`, la tabla
   `ingresos_fijos` (sustituye a `ingresos_fijos_mensuales`),
