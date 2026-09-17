@@ -61,8 +61,32 @@
       <span class="collapsible-chevron" aria-hidden="true">▾</span>
     </button>
     <div class="collapsible-body" id="ingresosBody" hidden>
+      <div class="fijo-form no-border" style="margin-bottom:18px;">
+        <p class="fijo-form-title">Filtrar</p>
+        <div class="field">
+          <label for="ingresosFiltroTextoInput">Buscar por concepto o nota</label>
+          <input type="text" id="ingresosFiltroTextoInput" placeholder="Ej. nómina" maxlength="120" />
+        </div>
+        <div class="two-col">
+          <div class="field">
+            <label for="ingresosFiltroFrecuenciaInput">Frecuencia</label>
+            <select id="ingresosFiltroFrecuenciaInput">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ingresosFiltroEstadoInput">Estado</label>
+            <select id="ingresosFiltroEstadoInput">
+              <option value="">Todos</option>
+              <option value="activo">Activos</option>
+              <option value="pausado">Pausados</option>
+            </select>
+          </div>
+        </div>
+      </div>
       <div id="ingresosList"></div>
       <p class="empty-note" id="ingresosEmpty" hidden>Aún no tienes ingresos fijos configurados.</p>
+      <p class="empty-note" id="ingresosFiltroEmpty" hidden>Ningún ingreso fijo coincide con el filtro.</p>
       <p class="error-note" id="ingresosErrorNote" hidden>No se pudo cargar. Recarga la página.</p>
     </div>
 
@@ -134,7 +158,12 @@ var PAGINA_ACTUAL = 'ingresos-fijos';
 
   var ingresosList = document.getElementById('ingresosList');
   var ingresosEmpty = document.getElementById('ingresosEmpty');
+  var ingresosFiltroEmpty = document.getElementById('ingresosFiltroEmpty');
   var ingresosErrorNote = document.getElementById('ingresosErrorNote');
+  var ingresosFiltroTextoInput = document.getElementById('ingresosFiltroTextoInput');
+  var ingresosFiltroFrecuenciaInput = document.getElementById('ingresosFiltroFrecuenciaInput');
+  var ingresosFiltroEstadoInput = document.getElementById('ingresosFiltroEstadoInput');
+  var ingresosData = [];
   var ingresosToggle = document.getElementById('ingresosToggle');
   var ingresosToggleLabel = document.getElementById('ingresosToggleLabel');
   var ingresosBody = document.getElementById('ingresosBody');
@@ -158,6 +187,42 @@ var PAGINA_ACTUAL = 'ingresos-fijos';
   poblarSelectFrecuencias(ingresoFrecuenciaInput);
   poblarSelectMetodosFijos(ingresoMetodoInput);
   ingresoFechaInput.value = hoyISO();
+
+  poblarSelectFrecuencias(ingresosFiltroFrecuenciaInput);
+
+  function coincideFiltroIngreso(ing, filtros) {
+    if (filtros.frecuencia && ing.frecuencia !== filtros.frecuencia) return false;
+    if (filtros.estado === 'activo' && !ing.activo) return false;
+    if (filtros.estado === 'pausado' && ing.activo) return false;
+    if (filtros.texto) {
+      var t = filtros.texto.toLowerCase();
+      var enConcepto = (ing.concepto || '').toLowerCase().indexOf(t) !== -1;
+      var enNota = (ing.nota || '').toLowerCase().indexOf(t) !== -1;
+      if (!enConcepto && !enNota) return false;
+    }
+    return true;
+  }
+
+  function leerFiltroIngresos() {
+    return {
+      texto: ingresosFiltroTextoInput.value.trim(),
+      frecuencia: ingresosFiltroFrecuenciaInput.value,
+      estado: ingresosFiltroEstadoInput.value
+    };
+  }
+
+  function aplicarFiltroIngresos() {
+    var filtros = leerFiltroIngresos();
+    var hayFiltroActivo = !!(filtros.texto || filtros.frecuencia || filtros.estado);
+    var filtrados = hayFiltroActivo ? ingresosData.filter(function (i) { return coincideFiltroIngreso(i, filtros); }) : ingresosData;
+    renderIngresos(filtrados);
+    ingresosEmpty.hidden = ingresosData.length > 0;
+    ingresosFiltroEmpty.hidden = !(hayFiltroActivo && ingresosData.length > 0 && filtrados.length === 0);
+  }
+
+  ingresosFiltroTextoInput.addEventListener('input', aplicarFiltroIngresos);
+  ingresosFiltroFrecuenciaInput.addEventListener('change', aplicarFiltroIngresos);
+  ingresosFiltroEstadoInput.addEventListener('change', aplicarFiltroIngresos);
 
   ingresosToggle.addEventListener('click', function () {
     var expandido = ingresosToggle.getAttribute('aria-expanded') === 'true';
@@ -230,7 +295,6 @@ var PAGINA_ACTUAL = 'ingresos-fijos';
   function renderIngresos(ingresos) {
     ingresosList.innerHTML = '';
     ingresos = ingresos || [];
-    ingresosEmpty.hidden = ingresos.length > 0;
 
     ingresos.forEach(function (ing) {
       var row = document.createElement('div');
@@ -381,7 +445,8 @@ var PAGINA_ACTUAL = 'ingresos-fijos';
     Promise.all([getIngresosFijos(), getPerfil(), getPendientesIngresosFijos()])
       .then(function (res) {
         ingresosErrorNote.hidden = true;
-        renderIngresos(res[0]);
+        ingresosData = res[0] || [];
+        aplicarFiltroIngresos();
         renderPendientes(res[2]);
         var perfil = res[1];
         if (perfil.dinero_inicial === null || typeof perfil.dinero_inicial === 'undefined') {

@@ -50,6 +50,89 @@
     </div>
   </div>
 
+  <section class="card" id="buscarCard">
+    <button type="button" class="collapsible-header" id="buscarToggle" aria-expanded="false" aria-controls="buscarBody">
+      <p class="eyebrow" style="margin:0;" id="buscarToggleLabel">Buscar movimientos</p>
+      <span class="collapsible-chevron" aria-hidden="true">▾</span>
+    </button>
+    <div class="collapsible-body" id="buscarBody" hidden>
+      <div class="field">
+        <label for="buscarTextoInput">Buscar por texto (categoría, concepto o nota)</label>
+        <input type="text" id="buscarTextoInput" placeholder="Ej. supermercado" maxlength="120" />
+      </div>
+
+      <div class="two-col">
+        <div class="field">
+          <label for="buscarTipoInput">Tipo</label>
+          <select id="buscarTipoInput">
+            <option value="">Todos</option>
+            <option value="gasto">Gastos</option>
+            <option value="ingreso">Ingresos</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="buscarCategoriaInput">Categoría</label>
+          <select id="buscarCategoriaInput">
+            <option value="">Todas</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="field">
+          <label for="buscarMetodoInput">Método de pago</label>
+          <select id="buscarMetodoInput">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="buscarTipoGastoInput">Necesario / prescindible</label>
+          <select id="buscarTipoGastoInput">
+            <option value="">Todos</option>
+            <option value="necesario">Necesario</option>
+            <option value="prescindible">Prescindible</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="field">
+          <label for="buscarFechaDesdeInput">Desde</label>
+          <input type="date" id="buscarFechaDesdeInput" />
+        </div>
+        <div class="field">
+          <label for="buscarFechaHastaInput">Hasta</label>
+          <input type="date" id="buscarFechaHastaInput" />
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="field">
+          <label for="buscarImporteMinInput">Importe mínimo</label>
+          <input type="number" inputmode="decimal" step="0.01" min="0" id="buscarImporteMinInput" placeholder="0,00" />
+        </div>
+        <div class="field">
+          <label for="buscarImporteMaxInput">Importe máximo</label>
+          <input type="number" inputmode="decimal" step="0.01" min="0" id="buscarImporteMaxInput" placeholder="0,00" />
+        </div>
+      </div>
+
+      <p class="form-error" id="buscarFormError"></p>
+
+      <div class="fijo-form-actions">
+        <button class="submit-btn" id="buscarSubmitBtn" type="button">Buscar</button>
+        <button class="link-btn" id="buscarLimpiarBtn" type="button">Limpiar filtros</button>
+      </div>
+
+      <div id="buscarResultados" hidden style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border);">
+        <p class="eyebrow" id="buscarResultadosLabel" style="margin:0 0 12px;">Resultados</p>
+        <div id="buscarList"></div>
+        <p class="empty-note" id="buscarEmpty" hidden>No se han encontrado movimientos con esos filtros.</p>
+        <p class="error-note" id="buscarErrorNote" hidden>No se pudo buscar. Inténtalo de nuevo.</p>
+      </div>
+    </div>
+  </section>
+
   <section class="card" id="movimientosCard">
     <p class="eyebrow" style="margin-bottom:12px;">Movimientos recientes</p>
     <div id="movimientosList"></div>
@@ -80,7 +163,7 @@ var PAGINA_ACTUAL = 'movimientos';
     return idEditando && idEditando.tipo === mov.tipo && idEditando.id === mov.id;
   }
 
-  function construirFila(mov) {
+  function construirFila(mov, callbacks) {
     var row = document.createElement('div');
     row.className = 'mov-row';
 
@@ -107,8 +190,7 @@ var PAGINA_ACTUAL = 'movimientos';
     editBtn.textContent = '✎';
     editBtn.setAttribute('aria-label', 'Editar movimiento');
     editBtn.addEventListener('click', function () {
-      idEditando = { tipo: mov.tipo, id: mov.id };
-      render();
+      callbacks.onEditar();
     });
 
     var delBtn = document.createElement('button');
@@ -120,7 +202,7 @@ var PAGINA_ACTUAL = 'movimientos';
     delBtn.addEventListener('click', function () {
       if (delBtn.classList.contains('confirm')) {
         clearTimeout(confirmTimeout);
-        borrarMovimiento(mov, delBtn);
+        borrarMovimiento(mov, delBtn, callbacks.onBorrado);
         return;
       }
       delBtn.classList.add('confirm');
@@ -139,7 +221,7 @@ var PAGINA_ACTUAL = 'movimientos';
     return row;
   }
 
-  function construirPanelEdicion(mov) {
+  function construirPanelEdicion(mov, callbacks) {
     var wrap = document.createElement('div');
     wrap.className = 'mov-edit';
 
@@ -238,8 +320,7 @@ var PAGINA_ACTUAL = 'movimientos';
     wrap.appendChild(actions);
 
     cancelBtn.addEventListener('click', function () {
-      idEditando = null;
-      render();
+      callbacks.onCancelar();
     });
 
     saveBtn.addEventListener('click', function () {
@@ -268,11 +349,9 @@ var PAGINA_ACTUAL = 'movimientos';
 
       editarMovimiento(payload)
         .then(function () {
-          idEditando = null;
-
           if (mov.tipo !== 'gasto') {
             showToast('Movimiento actualizado');
-            cargarResumen();
+            callbacks.onGuardado();
             return;
           }
 
@@ -307,11 +386,11 @@ var PAGINA_ACTUAL = 'movimientos';
           return comprobarAvisosPresupuesto(cambios)
             .then(function (avisos) {
               showToast(['Movimiento actualizado'].concat(avisos).join(' · '));
-              cargarResumen();
+              callbacks.onGuardado();
             })
             .catch(function () {
               showToast('Movimiento actualizado');
-              cargarResumen();
+              callbacks.onGuardado();
             });
         })
         .catch(function (err) {
@@ -326,12 +405,12 @@ var PAGINA_ACTUAL = 'movimientos';
     return wrap;
   }
 
-  function borrarMovimiento(mov, btn) {
+  function borrarMovimiento(mov, btn, onBorrado) {
     btn.disabled = true;
     eliminarMovimiento(mov.tipo, mov.id)
       .then(function () {
         showToast('Movimiento borrado');
-        cargarResumen();
+        if (onBorrado) onBorrado();
       })
       .catch(function (err) {
         showToast(err.message || 'No se pudo borrar. Recarga la página.');
@@ -345,7 +424,13 @@ var PAGINA_ACTUAL = 'movimientos';
     movimientosList.innerHTML = '';
     movimientosEmpty.hidden = movimientosData.length > 0;
     movimientosData.forEach(function (mov) {
-      movimientosList.appendChild(esElEditado(mov) ? construirPanelEdicion(mov) : construirFila(mov));
+      var callbacks = {
+        onEditar: function () { idEditando = { tipo: mov.tipo, id: mov.id }; render(); },
+        onCancelar: function () { idEditando = null; render(); },
+        onGuardado: function () { idEditando = null; cargarResumen(); },
+        onBorrado: function () { cargarResumen(); }
+      };
+      movimientosList.appendChild(esElEditado(mov) ? construirPanelEdicion(mov, callbacks) : construirFila(mov, callbacks));
     });
   }
 
@@ -364,6 +449,132 @@ var PAGINA_ACTUAL = 'movimientos';
         movimientosErrorNote.hidden = false;
       });
   }
+
+  // --- Buscador de movimientos (filtra sobre TODOS los movimientos, no
+  // solo los últimos 20 de "Movimientos recientes") ---
+  var buscarToggle = document.getElementById('buscarToggle');
+  var buscarToggleLabel = document.getElementById('buscarToggleLabel');
+  var buscarBody = document.getElementById('buscarBody');
+  var buscarTextoInput = document.getElementById('buscarTextoInput');
+  var buscarTipoInput = document.getElementById('buscarTipoInput');
+  var buscarCategoriaInput = document.getElementById('buscarCategoriaInput');
+  var buscarMetodoInput = document.getElementById('buscarMetodoInput');
+  var buscarTipoGastoInput = document.getElementById('buscarTipoGastoInput');
+  var buscarFechaDesdeInput = document.getElementById('buscarFechaDesdeInput');
+  var buscarFechaHastaInput = document.getElementById('buscarFechaHastaInput');
+  var buscarImporteMinInput = document.getElementById('buscarImporteMinInput');
+  var buscarImporteMaxInput = document.getElementById('buscarImporteMaxInput');
+  var buscarFormError = document.getElementById('buscarFormError');
+  var buscarSubmitBtn = document.getElementById('buscarSubmitBtn');
+  var buscarLimpiarBtn = document.getElementById('buscarLimpiarBtn');
+  var buscarResultados = document.getElementById('buscarResultados');
+  var buscarResultadosLabel = document.getElementById('buscarResultadosLabel');
+  var buscarList = document.getElementById('buscarList');
+  var buscarEmpty = document.getElementById('buscarEmpty');
+  var buscarErrorNote = document.getElementById('buscarErrorNote');
+
+  poblarSelectCategorias(buscarCategoriaInput);
+  poblarSelectMetodos(buscarMetodoInput);
+
+  var buscarData = [];
+  var idEditandoBusqueda = null;
+
+  function esElEditadoBusqueda(mov) {
+    return idEditandoBusqueda && idEditandoBusqueda.tipo === mov.tipo && idEditandoBusqueda.id === mov.id;
+  }
+
+  function renderBusqueda() {
+    buscarList.innerHTML = '';
+    buscarEmpty.hidden = buscarData.length > 0;
+    buscarData.forEach(function (mov) {
+      var callbacks = {
+        onEditar: function () { idEditandoBusqueda = { tipo: mov.tipo, id: mov.id }; renderBusqueda(); },
+        onCancelar: function () { idEditandoBusqueda = null; renderBusqueda(); },
+        onGuardado: function () { idEditandoBusqueda = null; ejecutarBusqueda(); cargarResumen(); },
+        onBorrado: function () { ejecutarBusqueda(); cargarResumen(); }
+      };
+      buscarList.appendChild(esElEditadoBusqueda(mov) ? construirPanelEdicion(mov, callbacks) : construirFila(mov, callbacks));
+    });
+  }
+
+  buscarToggle.addEventListener('click', function () {
+    var expandido = buscarToggle.getAttribute('aria-expanded') === 'true';
+    var nuevoExpandido = !expandido;
+    buscarToggle.setAttribute('aria-expanded', String(nuevoExpandido));
+    buscarBody.hidden = expandido;
+    buscarToggleLabel.textContent = nuevoExpandido ? 'Ocultar buscador' : 'Buscar movimientos';
+  });
+
+  function leerFiltrosBusqueda() {
+    var filtros = {};
+    var texto = buscarTextoInput.value.trim();
+    if (texto) filtros.texto = texto;
+    if (buscarTipoInput.value) filtros.tipo = buscarTipoInput.value;
+    if (buscarCategoriaInput.value) filtros.categoria = buscarCategoriaInput.value;
+    if (buscarMetodoInput.value) filtros.metodoPago = buscarMetodoInput.value;
+    if (buscarTipoGastoInput.value) filtros.tipoGasto = buscarTipoGastoInput.value;
+    if (buscarFechaDesdeInput.value) filtros.fechaDesde = buscarFechaDesdeInput.value;
+    if (buscarFechaHastaInput.value) filtros.fechaHasta = buscarFechaHastaInput.value;
+    if (buscarImporteMinInput.value !== '') filtros.importeMin = parseFloat(buscarImporteMinInput.value);
+    if (buscarImporteMaxInput.value !== '') filtros.importeMax = parseFloat(buscarImporteMaxInput.value);
+    return filtros;
+  }
+
+  function ejecutarBusqueda() {
+    var filtros = leerFiltrosBusqueda();
+    if (filtros.importeMin != null && filtros.importeMax != null && filtros.importeMin > filtros.importeMax) {
+      buscarFormError.textContent = 'El importe mínimo no puede ser mayor que el máximo.';
+      return;
+    }
+    if (filtros.fechaDesde && filtros.fechaHasta && filtros.fechaDesde > filtros.fechaHasta) {
+      buscarFormError.textContent = 'La fecha "desde" no puede ser posterior a "hasta".';
+      return;
+    }
+    buscarFormError.textContent = '';
+    buscarSubmitBtn.disabled = true;
+    buscarSubmitBtn.textContent = 'Buscando…';
+    idEditandoBusqueda = null;
+
+    buscarMovimientos(filtros)
+      .then(function (resultados) {
+        buscarErrorNote.hidden = true;
+        buscarResultados.hidden = false;
+        buscarData = resultados || [];
+        buscarResultadosLabel.textContent = 'Resultados (' + buscarData.length + ')';
+        renderBusqueda();
+      })
+      .catch(function () {
+        buscarResultados.hidden = false;
+        buscarErrorNote.hidden = false;
+        buscarData = [];
+        renderBusqueda();
+      })
+      .then(function () {
+        buscarSubmitBtn.disabled = false;
+        buscarSubmitBtn.textContent = 'Buscar';
+      });
+  }
+
+  buscarSubmitBtn.addEventListener('click', ejecutarBusqueda);
+  buscarTextoInput.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') ejecutarBusqueda();
+  });
+
+  buscarLimpiarBtn.addEventListener('click', function () {
+    buscarTextoInput.value = '';
+    buscarTipoInput.selectedIndex = 0;
+    buscarCategoriaInput.selectedIndex = 0;
+    buscarMetodoInput.selectedIndex = 0;
+    buscarTipoGastoInput.selectedIndex = 0;
+    buscarFechaDesdeInput.value = '';
+    buscarFechaHastaInput.value = '';
+    buscarImporteMinInput.value = '';
+    buscarImporteMaxInput.value = '';
+    buscarFormError.textContent = '';
+    buscarResultados.hidden = true;
+    buscarData = [];
+    idEditandoBusqueda = null;
+  });
 
   exigirSesion().then(function () {
     initNav();

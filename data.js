@@ -238,6 +238,84 @@ function getMovimientos(limite) {
   });
 }
 
+// Búsqueda de movimientos con filtros combinables (buscador de la
+// página Movimientos). "filtros" puede traer cualquier combinación de:
+//   texto        — busca en categoría/nota (gastos) o concepto (ingresos)
+//   tipo         — 'gasto' | 'ingreso' | '' (ambos)
+//   categoria    — solo aplica a gastos (los ingresos no tienen categoría)
+//   metodoPago   — aplica a ambas tablas
+//   tipoGasto    — 'necesario' | 'prescindible' (solo gastos)
+//   fechaDesde / fechaHasta — rango de fechas (YYYY-MM-DD, inclusive)
+//   importeMin / importeMax — rango de importe
+// Si no se indica "tipo" (o es ''), se consultan y mezclan ambas tablas,
+// igual que getMovimientos, pero sin el límite fijo de 20 (con un tope
+// razonable para no traer miles de filas de golpe).
+var BUSQUEDA_MOVIMIENTOS_LIMITE = 200;
+
+// PostgREST trata la coma, los paréntesis y las comillas como caracteres
+// reservados dentro de un filtro .or(...) — si el texto buscado trae
+// alguno (p. ej. "cena, con Ana"), hay que escaparlo o la consulta entera
+// se rompe. Encerrar el valor entre comillas dobles (escapando las que
+// pueda traer el propio texto) es la forma que documenta PostgREST.
+function escaparValorFiltro_(texto) {
+  return '"' + String(texto).replace(/["\\]/g, '\\$&') + '"';
+}
+
+function buscarMovimientos(filtros) {
+  filtros = filtros || {};
+  var incluirGastos = filtros.tipo !== 'ingreso';
+  var incluirIngresos = filtros.tipo !== 'gasto';
+
+  var consultaGastos = supabaseClient.from('gastos')
+    .select('id, fecha, categoria, importe, metodo_pago, nota, tipo_gasto');
+  if (filtros.categoria) consultaGastos = consultaGastos.eq('categoria', filtros.categoria);
+  if (filtros.tipoGasto) consultaGastos = consultaGastos.eq('tipo_gasto', filtros.tipoGasto);
+  if (filtros.metodoPago) consultaGastos = consultaGastos.eq('metodo_pago', filtros.metodoPago);
+  if (filtros.fechaDesde) consultaGastos = consultaGastos.gte('fecha', filtros.fechaDesde);
+  if (filtros.fechaHasta) consultaGastos = consultaGastos.lte('fecha', filtros.fechaHasta);
+  if (filtros.importeMin != null) consultaGastos = consultaGastos.gte('importe', filtros.importeMin);
+  if (filtros.importeMax != null) consultaGastos = consultaGastos.lte('importe', filtros.importeMax);
+  if (filtros.texto) {
+    var patronGastos = escaparValorFiltro_('%' + filtros.texto + '%');
+    consultaGastos = consultaGastos.or('categoria.ilike.' + patronGastos + ',nota.ilike.' + patronGastos);
+  }
+  consultaGastos = consultaGastos.order('fecha', { ascending: false }).order('id', { ascending: false }).limit(BUSQUEDA_MOVIMIENTOS_LIMITE);
+
+  var consultaIngresos = supabaseClient.from('ingresos')
+    .select('id, fecha, concepto, importe, metodo_pago');
+  if (filtros.metodoPago) consultaIngresos = consultaIngresos.eq('metodo_pago', filtros.metodoPago);
+  if (filtros.fechaDesde) consultaIngresos = consultaIngresos.gte('fecha', filtros.fechaDesde);
+  if (filtros.fechaHasta) consultaIngresos = consultaIngresos.lte('fecha', filtros.fechaHasta);
+  if (filtros.importeMin != null) consultaIngresos = consultaIngresos.gte('importe', filtros.importeMin);
+  if (filtros.importeMax != null) consultaIngresos = consultaIngresos.lte('importe', filtros.importeMax);
+  if (filtros.texto) consultaIngresos = consultaIngresos.ilike('concepto', '%' + filtros.texto + '%');
+  // Un texto de categoría o un filtro de "necesario/prescindible" solo
+  // puede cumplirlo un gasto: si se piden, no tiene sentido traer ingresos.
+  var ingresosDescartadosPorFiltroDeGasto = !!(filtros.categoria || filtros.tipoGasto);
+  consultaIngresos = consultaIngresos.order('fecha', { ascending: false }).order('id', { ascending: false }).limit(BUSQUEDA_MOVIMIENTOS_LIMITE);
+
+  return Promise.all([
+    incluirGastos ? consultaGastos : Promise.resolve({ data: [] }),
+    (incluirIngresos && !ingresosDescartadosPorFiltroDeGasto) ? consultaIngresos : Promise.resolve({ data: [] })
+  ]).then(function (res) {
+    var gastos = (lanzarSiError_(res[0]) || []).map(function (g) {
+      return { tipo: 'gasto', id: g.id, fecha: g.fecha, titulo: g.categoria || 'Otros',
+        metodoPago: g.metodo_pago || '', nota: g.nota || '', importe: Number(g.importe),
+        tipoGasto: g.tipo_gasto || null };
+    });
+    var ingresos = (lanzarSiError_(res[1]) || []).map(function (i) {
+      return { tipo: 'ingreso', id: i.id, fecha: i.fecha, titulo: i.concepto || 'Ingreso',
+        metodoPago: i.metodo_pago || '', nota: '', importe: Number(i.importe) };
+    });
+    var todos = gastos.concat(ingresos);
+    todos.sort(function (a, b) {
+      if (a.fecha !== b.fecha) return a.fecha < b.fecha ? 1 : -1;
+      return b.id - a.id;
+    });
+    return todos.slice(0, BUSQUEDA_MOVIMIENTOS_LIMITE);
+  });
+}
+
 function eliminarMovimiento(tipo, id) {
   var tabla = tipo === 'gasto' ? 'gastos' : 'ingresos';
   return supabaseClient.from(tabla).delete().eq('id', id).then(lanzarSiError_);

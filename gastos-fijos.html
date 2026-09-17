@@ -61,8 +61,38 @@
       <span class="collapsible-chevron" aria-hidden="true">▾</span>
     </button>
     <div class="collapsible-body" id="fijosBody" hidden>
+      <div class="fijo-form no-border" style="margin-bottom:18px;">
+        <p class="fijo-form-title">Filtrar</p>
+        <div class="field">
+          <label for="fijosFiltroTextoInput">Buscar por concepto o nota</label>
+          <input type="text" id="fijosFiltroTextoInput" placeholder="Ej. alquiler" maxlength="120" />
+        </div>
+        <div class="two-col">
+          <div class="field">
+            <label for="fijosFiltroCategoriaInput">Categoría</label>
+            <select id="fijosFiltroCategoriaInput">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="fijosFiltroFrecuenciaInput">Frecuencia</label>
+            <select id="fijosFiltroFrecuenciaInput">
+              <option value="">Todas</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="fijosFiltroEstadoInput">Estado</label>
+          <select id="fijosFiltroEstadoInput">
+            <option value="">Todos</option>
+            <option value="activo">Activos</option>
+            <option value="pausado">Pausados</option>
+          </select>
+        </div>
+      </div>
       <div id="fijosList"></div>
       <p class="empty-note" id="fijosEmpty" hidden>Aún no tienes gastos fijos configurados.</p>
+      <p class="empty-note" id="fijosFiltroEmpty" hidden>Ningún gasto fijo coincide con el filtro.</p>
       <p class="error-note" id="fijosErrorNote" hidden>No se pudo cargar. Recarga la página.</p>
     </div>
 
@@ -144,7 +174,13 @@ var PAGINA_ACTUAL = 'fijos';
 
   var fijosList = document.getElementById('fijosList');
   var fijosEmpty = document.getElementById('fijosEmpty');
+  var fijosFiltroEmpty = document.getElementById('fijosFiltroEmpty');
   var fijosErrorNote = document.getElementById('fijosErrorNote');
+  var fijosFiltroTextoInput = document.getElementById('fijosFiltroTextoInput');
+  var fijosFiltroCategoriaInput = document.getElementById('fijosFiltroCategoriaInput');
+  var fijosFiltroFrecuenciaInput = document.getElementById('fijosFiltroFrecuenciaInput');
+  var fijosFiltroEstadoInput = document.getElementById('fijosFiltroEstadoInput');
+  var fijosData = [];
   var fijosToggle = document.getElementById('fijosToggle');
   var fijosToggleLabel = document.getElementById('fijosToggleLabel');
   var fijosBody = document.getElementById('fijosBody');
@@ -172,6 +208,46 @@ var PAGINA_ACTUAL = 'fijos';
   poblarSelectMetodosFijos(fijoMetodoInput);
   poblarSelectTipoGasto(fijoTipoGastoInput);
   fijoFechaInput.value = hoyISO();
+
+  poblarSelectCategorias(fijosFiltroCategoriaInput);
+  poblarSelectFrecuencias(fijosFiltroFrecuenciaInput);
+
+  function coincideFiltroFijo(fijo, filtros) {
+    if (filtros.categoria && fijo.categoria !== filtros.categoria) return false;
+    if (filtros.frecuencia && fijo.frecuencia !== filtros.frecuencia) return false;
+    if (filtros.estado === 'activo' && !fijo.activo) return false;
+    if (filtros.estado === 'pausado' && fijo.activo) return false;
+    if (filtros.texto) {
+      var t = filtros.texto.toLowerCase();
+      var enConcepto = (fijo.concepto || '').toLowerCase().indexOf(t) !== -1;
+      var enNota = (fijo.nota || '').toLowerCase().indexOf(t) !== -1;
+      if (!enConcepto && !enNota) return false;
+    }
+    return true;
+  }
+
+  function leerFiltroFijos() {
+    return {
+      texto: fijosFiltroTextoInput.value.trim(),
+      categoria: fijosFiltroCategoriaInput.value,
+      frecuencia: fijosFiltroFrecuenciaInput.value,
+      estado: fijosFiltroEstadoInput.value
+    };
+  }
+
+  function aplicarFiltroFijos() {
+    var filtros = leerFiltroFijos();
+    var hayFiltroActivo = !!(filtros.texto || filtros.categoria || filtros.frecuencia || filtros.estado);
+    var filtrados = hayFiltroActivo ? fijosData.filter(function (f) { return coincideFiltroFijo(f, filtros); }) : fijosData;
+    renderFijos(filtrados);
+    fijosEmpty.hidden = fijosData.length > 0;
+    fijosFiltroEmpty.hidden = !(hayFiltroActivo && fijosData.length > 0 && filtrados.length === 0);
+  }
+
+  fijosFiltroTextoInput.addEventListener('input', aplicarFiltroFijos);
+  fijosFiltroCategoriaInput.addEventListener('change', aplicarFiltroFijos);
+  fijosFiltroFrecuenciaInput.addEventListener('change', aplicarFiltroFijos);
+  fijosFiltroEstadoInput.addEventListener('change', aplicarFiltroFijos);
 
   fijosToggle.addEventListener('click', function () {
     var expandido = fijosToggle.getAttribute('aria-expanded') === 'true';
@@ -244,7 +320,6 @@ var PAGINA_ACTUAL = 'fijos';
   function renderFijos(fijos) {
     fijosList.innerHTML = '';
     fijos = fijos || [];
-    fijosEmpty.hidden = fijos.length > 0;
 
     fijos.forEach(function (fijo) {
       var row = document.createElement('div');
@@ -402,7 +477,8 @@ var PAGINA_ACTUAL = 'fijos';
     Promise.all([getGastosFijos(), getPerfil(), getPendientesGastosFijos()])
       .then(function (res) {
         fijosErrorNote.hidden = true;
-        renderFijos(res[0]);
+        fijosData = res[0] || [];
+        aplicarFiltroFijos();
         renderPendientes(res[2]);
         var perfil = res[1];
         if (perfil.dinero_inicial === null || typeof perfil.dinero_inicial === 'undefined') {
