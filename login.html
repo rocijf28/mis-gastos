@@ -61,7 +61,7 @@
     supabaseClient.auth.signInWithPassword({ email: email, password: password })
       .then(function (res) {
         if (res.error) throw new Error(res.error.message);
-        window.location.href = 'index.html';
+        window.location.href = 'registro.html';
       })
       .catch(function (err) {
         loginError.textContent = 'No se pudo entrar: correo o contraseña incorrectos.';
@@ -75,7 +75,7 @@
 
   // Si ya hay sesión iniciada, no hace falta pasar por aquí
   supabaseClient.auth.getSession().then(function (res) {
-    if (res.data && res.data.session) window.location.href = 'index.html';
+    if (res.data && res.data.session) window.location.href = 'registro.html';
   });
 </script>
 </body>

@@ -134,7 +134,7 @@
     supabaseClient.auth.updateUser({ password: p1 })
       .then(function (res) {
         if (res.error) throw new Error(res.error.message);
-        window.location.href = 'index.html';
+        window.location.href = 'registro.html';
       })
       .catch(function (err) {
         formError.textContent = 'No se pudo guardar la contraseña: ' + (err.message || 'inténtalo de nuevo.');

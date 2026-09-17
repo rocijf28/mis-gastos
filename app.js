@@ -46,10 +46,10 @@ function categoriasPorDefecto(tipo) {
 // sentido para algo recurrente (ver METODOS_PAGO_FIJOS).
 var METODOS_PAGO = ['Tarjeta', 'Efectivo', 'Bizum', 'Transferencia', 'Otro'];
 // Métodos de pago para Gastos fijos e Ingresos fijos (recurrentes):
-// añade "Domiciliación" al final de la lista general.
-var METODOS_PAGO_FIJOS = METODOS_PAGO.concat(['Domiciliación']);
+// añade "Domiciliación" a la lista general, justo antes de "Otro".
+var METODOS_PAGO_FIJOS = ['Tarjeta', 'Efectivo', 'Bizum', 'Transferencia', 'Domiciliación', 'Otro'];
 
-var FRECUENCIAS = ['Mensual', 'Trimestral', 'Semestral', 'Anual'];
+var FRECUENCIAS = ['Semanal', 'Mensual', 'Trimestral', 'Semestral', 'Anual'];
 var MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -155,6 +155,12 @@ var MESES_POR_FRECUENCIA = { 'Mensual': 1, 'Trimestral': 3, 'Semestral': 6, 'Anu
 
 function avanzarFecha(fechaISO, frecuencia) {
   var partes = fechaISO.split('-').map(Number);
+  if (frecuencia === 'Semanal') {
+    var dSemana = new Date(partes[0], partes[1] - 1, partes[2] + 7);
+    var mmSemana = String(dSemana.getMonth() + 1).padStart(2, '0');
+    var ddSemana = String(dSemana.getDate()).padStart(2, '0');
+    return dSemana.getFullYear() + '-' + mmSemana + '-' + ddSemana;
+  }
   var pasos = MESES_POR_FRECUENCIA[frecuencia] || 1;
   var d = new Date(partes[0], (partes[1] - 1) + pasos, partes[2]);
   var mm = String(d.getMonth() + 1).padStart(2, '0');

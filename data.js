@@ -81,7 +81,7 @@ function eliminarPresupuestoCategoria(categoria) {
 // una categoría para comprobar su límite (si tiene uno). "delta" es
 // cuánto ha subido (o bajado, si es negativo) el gasto de ese mes en esa
 // categoría/total por esta acción concreta — quien llama a esta función
-// es responsable de calcularlo bien (ver index.html y movimientos.html,
+// es responsable de calcularlo bien (ver registro.html y movimientos.html,
 // que tienen en cuenta cambios de mes y de categoría al editar).
 // Devuelve una promesa con la lista de mensajes de aviso (puede ser vacía).
 function comprobarAvisosPresupuesto(cambios) {
