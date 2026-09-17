@@ -209,6 +209,7 @@ var PAGINA_ACTUAL = 'fijos';
 
   poblarSelectCategorias(fijoCategoriaInput);
   poblarSelectFrecuencias(fijoFrecuenciaInput);
+  fijoFrecuenciaInput.value = 'Mensual';
   poblarSelectMetodosFijos(fijoMetodoInput);
   poblarSelectTipoGasto(fijoTipoGastoInput);
   fijoFechaInput.value = hoyISO();
@@ -407,7 +408,7 @@ var PAGINA_ACTUAL = 'fijos';
     fijoConceptoInput.value = '';
     fijoCategoriaInput.selectedIndex = 0;
     fijoImporteInput.value = '';
-    fijoFrecuenciaInput.selectedIndex = 0;
+    fijoFrecuenciaInput.value = 'Mensual';
     fijoMetodoInput.selectedIndex = 0;
     fijoFechaInput.value = hoyISO();
     fijoTipoGastoInput.selectedIndex = 0;

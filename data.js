@@ -399,7 +399,7 @@ function getResumenActual() {
 
   return Promise.all([
     getPerfil(),
-    supabaseClient.from('gastos').select('fecha, categoria, importe, tipo_gasto')
+    supabaseClient.from('gastos').select('fecha, categoria, importe, tipo_gasto, gasto_fijo_id')
       .gte('fecha', inicioMes).lt('fecha', inicioMesSiguiente),
     supabaseClient.from('ingresos').select('importe, ingreso_fijo_id')
       .gte('fecha', inicioMes).lt('fecha', inicioMesSiguiente),
@@ -415,6 +415,11 @@ function getResumenActual() {
     var totalMesActual = 0, mayorGasto = 0, totalHastaHoy = 0;
     var necesarioMes = 0, prescindibleMes = 0;
 
+    // Un gasto con "gasto_fijo_id" viene de un gasto fijo activo (lo ha
+    // cobrado la automatización diaria, o lo has confirmado si era
+    // "variable"); sin él, es un gasto puntual añadido a mano en Registrar.
+    var gastosFijosMes = 0, gastosPuntualesMes = 0;
+
     gastosMes.forEach(function (g) {
       var importe = Number(g.importe) || 0;
       totalMesActual += importe;
@@ -423,6 +428,8 @@ function getResumenActual() {
       if (g.fecha <= hoyStr) totalHastaHoy += importe;
       if (tipoEfectivo(g.categoria, g.tipo_gasto) === 'necesario') necesarioMes += importe;
       else prescindibleMes += importe;
+      if (g.gasto_fijo_id) gastosFijosMes += importe;
+      else gastosPuntualesMes += importe;
     });
 
     // Un ingreso con "ingreso_fijo_id" viene de un ingreso fijo (nómina...);
@@ -444,7 +451,11 @@ function getResumenActual() {
       dineroInicialPendiente: perfil.dinero_inicial === null || typeof perfil.dinero_inicial === 'undefined',
       nomina: Number(perfil.nomina_base) || 0,
       totalMes: totalMesActual,
+      gastosFijosMes: gastosFijosMes,
+      gastosPuntualesMes: gastosPuntualesMes,
       ingresosMes: ingresosMesActual,
+      ingresosFijosMes: ingresosFijosMes,
+      ingresosPuntualesMes: ingresosPuntualesMes,
       ahorroMes: ahorroMes,
       pctAhorroMes: pctAhorroMes,
       gastoMedioDiario: gastoMedioDiario,

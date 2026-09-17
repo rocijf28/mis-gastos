@@ -189,6 +189,7 @@ var PAGINA_ACTUAL = 'ingresos-fijos';
   var ingresoIdEditando = null;
 
   poblarSelectFrecuencias(ingresoFrecuenciaInput);
+  ingresoFrecuenciaInput.value = 'Mensual';
   poblarSelectMetodosFijos(ingresoMetodoInput);
   ingresoFechaInput.value = hoyISO();
 
@@ -378,7 +379,7 @@ var PAGINA_ACTUAL = 'ingresos-fijos';
     ingresoIdEditando = null;
     ingresoConceptoInput.value = '';
     ingresoImporteInput.value = '';
-    ingresoFrecuenciaInput.selectedIndex = 0;
+    ingresoFrecuenciaInput.value = 'Mensual';
     ingresoMetodoInput.selectedIndex = 0;
     ingresoFechaInput.value = hoyISO();
     ingresoNotaInput.value = '';
