@@ -165,16 +165,22 @@ var PAGINA_ACTUAL = 'resumen';
     statGrid.appendChild(saldoBox);
 
     statGrid.appendChild(crearStatBox('Dinero inicial', eur(resumen.dineroInicial)));
+
+    // Gastos del mes, con su desglose y detalles, todo junto.
     statGrid.appendChild(crearStatBox('Total gastos', eur(resumen.totalMes)));
     statGrid.appendChild(crearStatBox('Gastos puntuales', eur(resumen.gastosPuntualesMes) + pctDelTotal(resumen.gastosPuntualesMes, resumen.totalMes)));
     statGrid.appendChild(crearStatBox('Gastos fijos', eur(resumen.gastosFijosMes) + pctDelTotal(resumen.gastosFijosMes, resumen.totalMes)));
+    statGrid.appendChild(crearStatBox('Gasto medio diario', eur(resumen.gastoMedioDiario)));
+    statGrid.appendChild(crearStatBox('Mayor gasto del mes', eur(resumen.mayorGasto)));
+
+    // Ingresos del mes, con su desglose.
     statGrid.appendChild(crearStatBox('Total ingresos', eur(resumen.ingresosMes)));
     statGrid.appendChild(crearStatBox('Ingresos puntuales', eur(resumen.ingresosPuntualesMes) + pctDelTotal(resumen.ingresosPuntualesMes, resumen.ingresosMes)));
     statGrid.appendChild(crearStatBox('Ingresos fijos', eur(resumen.ingresosFijosMes) + pctDelTotal(resumen.ingresosFijosMes, resumen.ingresosMes)));
+
+    // El resultado del mes, como conclusión de todo lo anterior.
     statGrid.appendChild(crearStatBox('Ahorro este mes', eur(resumen.ahorroMes), signoClase(resumen.ahorroMes)));
     statGrid.appendChild(crearStatBox('% ahorrado', (resumen.pctAhorroMes * 100).toFixed(1) + ' %', signoClase(resumen.ahorroMes)));
-    statGrid.appendChild(crearStatBox('Gasto medio diario', eur(resumen.gastoMedioDiario)));
-    statGrid.appendChild(crearStatBox('Mayor gasto del mes', eur(resumen.mayorGasto)));
   }
 
   function filaPresupuesto(nombre, gastado, limite) {
