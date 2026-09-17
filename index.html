@@ -4,17 +4,115 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; object-src 'none'; base-uri 'self';">
-<meta http-equiv="refresh" content="0; url=registro.html">
+<meta http-equiv="refresh" content="1; url=registro.html">
 <title>Mis Gastos</title>
+<style>
+  :root {
+    --paper: #eaefe4;
+    --paper-line: #cdd6c1;
+    --ink: #1e2a1d;
+    --ink-muted: #57634f;
+    --accent: #b8452c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #121a13;
+      --paper-line: #253226;
+      --ink: #e7eee0;
+      --ink-muted: #9bab90;
+      --accent: #e2825d;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background:
+      repeating-linear-gradient(to bottom, transparent, transparent 27px, var(--paper-line) 27px, var(--paper-line) 28px),
+      var(--paper);
+    color: var(--ink);
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  .splash {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+    animation: splashIn 420ms ease-out forwards;
+  }
+  .splash-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    box-shadow: 0 6px 18px rgba(30, 42, 29, 0.18);
+  }
+  .splash-title {
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin: 0;
+    letter-spacing: 0.01em;
+  }
+  .splash-bar-track {
+    width: 120px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--paper-line);
+    overflow: hidden;
+  }
+  .splash-bar-fill {
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+    border-radius: 2px;
+    animation: splashBar 550ms ease-in-out forwards;
+  }
+  .splash-fallback {
+    font-family: system-ui, sans-serif;
+    font-size: 0.8rem;
+    color: var(--ink-muted);
+    margin: 0;
+  }
+  .splash-fallback a { color: var(--accent); }
+  @keyframes splashIn {
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes splashBar {
+    to { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .splash { animation: none; opacity: 1; transform: none; }
+    .splash-bar-fill { animation: none; width: 100%; }
+  }
+</style>
 </head>
 <body>
 <!--
   Esta página ya no es la pantalla de "Registrar" (ver registro.html):
   se mantiene solo como redirección automática, porque GitHub Pages
   sirve siempre index.html para la URL raíz del sitio, y los accesos
-  directos de la app instalada (PWA) siguen apuntando aquí.
+  directos de la app instalada (PWA) siguen apuntando aquí. La animación
+  es solo mientras redirige (bajo medio segundo, no se hace esperar).
 -->
-<p>Redirigiendo… si no ocurre automáticamente, <a href="registro.html">entra aquí</a>.</p>
-<script>window.location.replace('registro.html');</script>
+<div class="splash">
+  <img class="splash-icon" src="icons/icon-192.png" alt="" width="64" height="64">
+  <p class="splash-title">Mis Gastos</p>
+  <div class="splash-bar-track"><div class="splash-bar-fill"></div></div>
+  <p class="splash-fallback" id="fallbackLink" hidden>Si no ocurre automáticamente, <a href="registro.html">entra aquí</a>.</p>
+</div>
+<script>
+  setTimeout(function () { window.location.replace('registro.html'); }, 550);
+  setTimeout(function () {
+    var el = document.getElementById('fallbackLink');
+    if (el) el.hidden = false;
+  }, 2500);
+</script>
 </body>
 </html>
