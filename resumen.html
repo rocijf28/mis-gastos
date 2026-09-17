@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self'; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'self';">
 <title>Mis Gastos — Resumen</title>
 <link rel="stylesheet" href="styles.css">
 <link rel="manifest" href="manifest.webmanifest">
@@ -168,12 +169,28 @@ var PAGINA_ACTUAL = 'resumen';
     var color = colorPresupuesto(gastado / limite);
     var wrap = document.createElement('div');
     wrap.style.marginBottom = '14px';
-    wrap.innerHTML =
-      '<div class="cat-row-label">' +
-        '<span class="name">' + nombre + '</span>' +
-        '<span class="value">' + eur(gastado) + ' / ' + eur(limite) + '</span>' +
-      '</div>' +
-      '<div class="bar-track"><div class="bar-fill" style="width:' + Math.max(4, pct) + '%; background:var(--' + color + ')"></div></div>';
+
+    var label = document.createElement('div');
+    label.className = 'cat-row-label';
+    var nameEl = document.createElement('span');
+    nameEl.className = 'name';
+    nameEl.textContent = nombre;
+    var valueEl = document.createElement('span');
+    valueEl.className = 'value';
+    valueEl.textContent = eur(gastado) + ' / ' + eur(limite);
+    label.appendChild(nameEl);
+    label.appendChild(valueEl);
+
+    var track = document.createElement('div');
+    track.className = 'bar-track';
+    var fill = document.createElement('div');
+    fill.className = 'bar-fill';
+    fill.style.width = Math.max(4, pct) + '%';
+    fill.style.background = 'var(--' + color + ')';
+    track.appendChild(fill);
+
+    wrap.appendChild(label);
+    wrap.appendChild(track);
     return wrap;
   }
 
@@ -205,13 +222,38 @@ var PAGINA_ACTUAL = 'resumen';
       var pct = Math.round((entry.value / total) * 100);
       var categorias = categoriasPorDefecto(entry.tipo);
       var wrap = document.createElement('div');
-      wrap.innerHTML =
-        '<div class="cat-row-label">' +
-          '<span class="name"><span class="cat-dot" style="background:' + entry.color + '"></span>' + entry.name + '</span>' +
-          '<span class="value">' + eur(entry.value) + ' · ' + pct + '%</span>' +
-        '</div>' +
-        '<div class="bar-track"><div class="bar-fill" style="width:' + Math.max(4, pct) + '%; background:' + entry.color + '"></div></div>' +
-        '<p class="hint" style="margin:4px 0 0;">Por defecto: ' + categorias + '</p>';
+
+      var label = document.createElement('div');
+      label.className = 'cat-row-label';
+      var nameEl = document.createElement('span');
+      nameEl.className = 'name';
+      var dot = document.createElement('span');
+      dot.className = 'cat-dot';
+      dot.style.background = entry.color;
+      nameEl.appendChild(dot);
+      nameEl.appendChild(document.createTextNode(entry.name));
+      var valueEl = document.createElement('span');
+      valueEl.className = 'value';
+      valueEl.textContent = eur(entry.value) + ' · ' + pct + '%';
+      label.appendChild(nameEl);
+      label.appendChild(valueEl);
+
+      var track = document.createElement('div');
+      track.className = 'bar-track';
+      var fill = document.createElement('div');
+      fill.className = 'bar-fill';
+      fill.style.width = Math.max(4, pct) + '%';
+      fill.style.background = entry.color;
+      track.appendChild(fill);
+
+      var hint = document.createElement('p');
+      hint.className = 'hint';
+      hint.style.margin = '4px 0 0';
+      hint.textContent = 'Por defecto: ' + categorias;
+
+      wrap.appendChild(label);
+      wrap.appendChild(track);
+      wrap.appendChild(hint);
       necesarioRows.appendChild(wrap);
     });
   }
@@ -233,12 +275,32 @@ var PAGINA_ACTUAL = 'resumen';
       var pct = max > 0 ? Math.max(4, Math.round((entry.value / max) * 100)) : 0;
 
       var wrap = document.createElement('div');
-      wrap.innerHTML =
-        '<div class="cat-row-label">' +
-          '<span class="name"><span class="cat-dot" style="background:' + color + '"></span>' + entry.name + '</span>' +
-          '<span class="value">' + eur(entry.value) + '</span>' +
-        '</div>' +
-        '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%; background:' + color + '"></div></div>';
+
+      var label = document.createElement('div');
+      label.className = 'cat-row-label';
+      var nameEl = document.createElement('span');
+      nameEl.className = 'name';
+      var dot = document.createElement('span');
+      dot.className = 'cat-dot';
+      dot.style.background = color;
+      nameEl.appendChild(dot);
+      nameEl.appendChild(document.createTextNode(entry.name));
+      var valueEl = document.createElement('span');
+      valueEl.className = 'value';
+      valueEl.textContent = eur(entry.value);
+      label.appendChild(nameEl);
+      label.appendChild(valueEl);
+
+      var track = document.createElement('div');
+      track.className = 'bar-track';
+      var fill = document.createElement('div');
+      fill.className = 'bar-fill';
+      fill.style.width = pct + '%';
+      fill.style.background = color;
+      track.appendChild(fill);
+
+      wrap.appendChild(label);
+      wrap.appendChild(track);
       catRows.appendChild(wrap);
     });
   }

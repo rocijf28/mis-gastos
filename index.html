@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self'; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'self';">
 <title>Mis Gastos</title>
 <link rel="stylesheet" href="styles.css">
 <link rel="manifest" href="manifest.webmanifest">
@@ -298,7 +299,14 @@ var PAGINA_ACTUAL = 'registrar';
       row.className = 'fijo-row';
       var info = document.createElement('div');
       info.className = 'fijo-info';
-      info.innerHTML = '<p class="fijo-title">' + cat + '</p><p class="fijo-meta">' + eur(porCategoria[cat]) + '</p>';
+      var catTitle = document.createElement('p');
+      catTitle.className = 'fijo-title';
+      catTitle.textContent = cat;
+      var catMeta = document.createElement('p');
+      catMeta.className = 'fijo-meta';
+      catMeta.textContent = eur(porCategoria[cat]);
+      info.appendChild(catTitle);
+      info.appendChild(catMeta);
       var quitarBtn = document.createElement('button');
       quitarBtn.type = 'button';
       quitarBtn.className = 'link-btn danger';
