@@ -693,3 +693,24 @@
       transition: none;
     }
   }
+
+  /* --- Distribución en pantallas anchas (PC / tablet apaisada): a
+  partir de 900px se reparten las tarjetas en dos columnas en vez de
+  una sola columna centrada; por debajo de ese ancho (móvil) todo se
+  queda exactamente igual que antes. El login y "crear contraseña"
+  usan su propio contenedor (.login-wrap, no .shell) y quedan fuera de
+  esto a propósito: un formulario de acceso se ve mejor siempre
+  estrecho y centrado, aunque el resto de la app se ensanche. */
+  @media (min-width: 900px) {
+    .shell {
+      max-width: 960px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+    .shell > header.app-header,
+    .shell > nav.nav-bar {
+      grid-column: 1 / -1;
+    }
+  }
