@@ -708,6 +708,7 @@
       grid-template-columns: repeat(2, 1fr);
       gap: 20px;
       align-items: start;
+      align-content: start;
     }
     .shell > header.app-header,
     .shell > nav.nav-bar {
