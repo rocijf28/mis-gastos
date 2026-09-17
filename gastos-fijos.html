@@ -95,8 +95,10 @@
       <p class="empty-note" id="fijosFiltroEmpty" hidden>Ningún gasto fijo coincide con el filtro.</p>
       <p class="error-note" id="fijosErrorNote" hidden>No se pudo cargar. Recarga la página.</p>
     </div>
+  </section>
 
-    <div class="fijo-form">
+  <section class="card" id="fijoFormCard">
+    <div class="fijo-form no-border">
       <p class="fijo-form-title" id="fijoFormTitle">Añadir gasto fijo</p>
 
       <div class="field">
@@ -395,7 +397,7 @@ var PAGINA_ACTUAL = 'fijos';
     fijoSaveBtn.textContent = 'Guardar cambios';
     fijoCancelBtn.hidden = false;
     fijoFormError.textContent = '';
-    document.getElementById('fijosCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    document.getElementById('fijoFormCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function resetFijoFormulario() {

@@ -89,8 +89,10 @@
       <p class="empty-note" id="ingresosFiltroEmpty" hidden>Ningún ingreso fijo coincide con el filtro.</p>
       <p class="error-note" id="ingresosErrorNote" hidden>No se pudo cargar. Recarga la página.</p>
     </div>
+  </section>
 
-    <div class="fijo-form">
+  <section class="card" id="ingresoFormCard">
+    <div class="fijo-form no-border">
       <p class="fijo-form-title" id="ingresoFormTitle">Añadir ingreso fijo</p>
 
       <div class="field">
@@ -367,7 +369,7 @@ var PAGINA_ACTUAL = 'ingresos-fijos';
     ingresoSaveBtn.textContent = 'Guardar cambios';
     ingresoCancelBtn.hidden = false;
     ingresoFormError.textContent = '';
-    document.getElementById('ingresosFijosListCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    document.getElementById('ingresoFormCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function resetIngresoFormulario() {
